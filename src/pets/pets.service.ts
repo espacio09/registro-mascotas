@@ -1,18 +1,49 @@
 import { Injectable } from '@nestjs/common';
 
+type Pet = {
+  id: number;
+  [key: string]: unknown;
+};
+
+type CreatePetDto = Omit<Pet, 'id'>;
+
+type UpdatePetDto = Partial<Omit<Pet, 'id'>>;
+
 @Injectable()
 export class PetsService {
-  private pets = [
-    { id: 1, name: 'Minnie', type: 'dog' },
-    { id: 2, name: 'Spike', type: 'dog' },
-    { id: 3, name: 'Luna', type: 'cat' },
-  ];
+  private pets: Pet[] = [];
 
-  findAll() {
+  findAll(): Pet[] {
     return this.pets;
   }
 
-  findOne(id: number) {
-    return this.pets.find((pet) => pet.id === id);
+  findOne(id: number): Pet | undefined {
+    return this.pets.find((p) => p.id === id);
+  }
+
+  create(pet: CreatePetDto): Pet {
+    const newPet: Pet = {
+      id: this.pets.length + 1,
+      ...pet,
+    };
+    this.pets.push(newPet);
+    return newPet;
+  }
+
+  update(id: number, updatePet: UpdatePetDto): Pet | undefined {
+    const pet = this.findOne(id);
+    if (pet) {
+      Object.assign(pet, updatePet);
+    }
+    return pet;
+  }
+
+  remove(id: number): Pet | null {
+    const index = this.pets.findIndex((p) => p.id === id);
+    if (index !== -1) {
+      const [removed] = this.pets.splice(index, 1);
+      return removed;
+    }
+    return null;
   }
 }
