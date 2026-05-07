@@ -8,6 +8,7 @@ import {
   Delete,
 } from '@nestjs/common';
 import { PetsService } from './pets.service';
+import { CreatePetDto } from './dto/create-pet.dto';
 
 @Controller('pets')
 export class PetsController {
@@ -24,8 +25,8 @@ export class PetsController {
   }
 
   @Post()
-  create(@Body() createPetDto: any) {
-    return this.petsService.create(createPetDto);
+  create(@Body() createPetDto: CreatePetDto) {
+    return this.petsService.create(createPetDto as CreatePetDto);
   }
 
   @Put(':id')
