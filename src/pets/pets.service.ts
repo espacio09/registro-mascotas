@@ -1,4 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { CreatePetDto } from './dto/create-pet.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { constructor } from 'path/win32';
+
+
+constructor(
+@InjectRepository(Pet)
+private petRepository: Repository<Pet>,
+) {}
 
 type Pet = {
   id: number;
@@ -47,3 +57,7 @@ export class PetsService {
     return null;
   }
 }
+
+
+
+
