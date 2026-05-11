@@ -1,4 +1,5 @@
 export class CreatePetDto {
-name!: string;
-age: number;
+  name!: string;
+  age!: number;
+  breed!: string;
 }

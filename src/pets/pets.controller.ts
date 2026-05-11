@@ -26,11 +26,11 @@ export class PetsController {
 
   @Post()
   create(@Body() createPetDto: CreatePetDto) {
-    return this.petsService.create(createPetDto as CreatePetDto);
+    return this.petsService.create(createPetDto);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() updatePetDto: any) {
+  update(@Param('id') id: string, @Body() updatePetDto: UpdatePetDto) {
     return this.petsService.update(Number(id), updatePetDto);
   }
 
