@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export class VetsService {
+export class VetsServices {
   private vets = [
     { id: 1, name: 'Dr. Willems', specialty: 'General Practice' },
     { id: 2, name: 'Dr. Johnson', specialty: 'Allergy' },

@@ -8,17 +8,18 @@ import {
   Delete,
 } from '@nestjs/common';
 
-import { VetsService } from './vets.service';
+import { VetsServices } from './vets.services';
 import { CreateVetDto } from './dto/create-vet.dto';
 import { UpdateVetDto } from './dto/update-vet.dto';
 
 @Controller('vets')
 export class VetsController {
-  constructor(private readonly vetsService: VetsService) {}
+  vetsServices: any;
+  constructor(private readonly vetsService: VetsServices) {}
 
   @Get()
   getAllVets() {
-    return this.vetsService.findAll();
+    return this.vetsServices.findAll();
   }
 
   @Get(':id')
@@ -28,16 +29,16 @@ export class VetsController {
 
   @Post()
   create(@Body() createVetDto: CreateVetDto) {
-    return this.vetsService.create(createVetDto);
+    return this.vetsServices.create(createVetDto);
   }
 
   @Put(':id')
   update(@Param('id') id: string, @Body() updateVetDto: UpdateVetDto) {
-    return this.vetsService.update(Number(id), updateVetDto);
+    return this.vetsServices.update(Number(id), updateVetDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.vetsService.remove(Number(id));
+    return this.vetsServices.remove(Number(id));
   }
 }

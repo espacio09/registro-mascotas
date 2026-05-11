@@ -1,63 +1,51 @@
-import { Injectable } from '@nestjs/common';
-import { CreatePetDto } from './dto/create-pet.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { constructor } from 'path/win32';
-
-
-constructor(
-@InjectRepository(Pet)
-private petRepository: Repository<Pet>,
-) {}
-
-type Pet = {
-  id: number;
-  [key: string]: unknown;
-};
-
-type CreatePetDto = Omit<Pet, 'id'>;
-
-type UpdatePetDto = Partial<Omit<Pet, 'id'>>;
+import { Pet } from './entities/pet.entity';
+import { CreatePetDto } from './dto/create-pet.dto';
+import { UpdatePetDto } from './dto/update-pet.dto';
 
 @Injectable()
 export class PetsService {
-  private pets: Pet[] = [];
+  constructor(
+    @InjectRepository(Pet)
+    private petRepository: Repository<Pet>,
+  ) {}
 
-  findAll(): Pet[] {
-    return this.pets;
+  async create(dto: CreatePetDto) {
+    const pet = this.petRepository.create(dto);
+    return await this.petRepository.save(pet);
   }
 
-  findOne(id: number): Pet | undefined {
-    return this.pets.find((p) => p.id === id);
+  //  READ ALL
+  async findAll() {
+    return await this.petRepository.find();
   }
 
-  create(pet: CreatePetDto): Pet {
-    const newPet: Pet = {
-      id: this.pets.length + 1,
-      ...pet,
-    };
-    this.pets.push(newPet);
-    return newPet;
-  }
+  //  READ ONE
+  async findOne(id: number) {
+    const pet = await this.petRepository.findOneBy({ id });
 
-  update(id: number, updatePet: UpdatePetDto): Pet | undefined {
-    const pet = this.findOne(id);
-    if (pet) {
-      Object.assign(pet, updatePet);
+    if (!pet) {
+      throw new NotFoundException('Pet not found');
     }
+
     return pet;
   }
 
-  remove(id: number): Pet | null {
-    const index = this.pets.findIndex((p) => p.id === id);
-    if (index !== -1) {
-      const [removed] = this.pets.splice(index, 1);
-      return removed;
-    }
-    return null;
+  //  UPDATE
+  async update(id: number, dto: UpdatePetDto) {
+    const pet = await this.findOne(id);
+
+    Object.assign(pet, dto);
+
+    return this.petRepository.save(pet);
+  }
+
+  //  DELETE
+  async remove(id: number) {
+    const pet = await this.findOne(id);
+
+    return await this.petRepository.remove(pet);
   }
 }
-
-
-
-

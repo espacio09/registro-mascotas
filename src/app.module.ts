@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { OwnersModule } from './owners/owners.module';
 import { PetsModule } from './pets/pets.module';
+import { VetsModule } from './vets/vets.module';
 
 @Module({
   imports: [
@@ -9,12 +11,15 @@ import { PetsModule } from './pets/pets.module';
       host: 'localhost',
       port: 5432,
       username: 'postgres',
-      password: 'password',
-      database: 'pets_db',
+      password: 'mariposa',
+      database: 'MinnieDB',
       autoLoadEntities: true,
       synchronize: true,
+      logging: true,
     }),
     PetsModule,
+    OwnersModule,
+    VetsModule,
   ],
 })
 export class AppModule {}
