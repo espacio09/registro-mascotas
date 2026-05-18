@@ -12,11 +12,6 @@ export class PetsService {
     private petRepository: Repository<Pet>,
   ) {}
 
-  async create(dto: CreatePetDto) {
-    const pet = this.petRepository.create(dto);
-    return await this.petRepository.save(pet);
-  }
-
   //  READ ALL
   async findAll() {
     return await this.petRepository.find();
@@ -29,23 +24,27 @@ export class PetsService {
     if (!pet) {
       throw new NotFoundException('Pet not found');
     }
-
     return pet;
   }
 
   //  UPDATE
   async update(id: number, dto: UpdatePetDto) {
     const pet = await this.findOne(id);
-
     Object.assign(pet, dto);
-
     return this.petRepository.save(pet);
   }
+
+  //  CREATE
+
+  async create(createPetDto: CreatePetDto) {
+    const pet = this.petRepository.create(createPetDto);
+    return this.petRepository.save(pet);
+}
+
 
   //  DELETE
   async remove(id: number) {
     const pet = await this.findOne(id);
-
     return await this.petRepository.remove(pet);
   }
 }

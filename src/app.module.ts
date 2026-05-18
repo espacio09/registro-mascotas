@@ -14,7 +14,7 @@ import { VetsModule } from './vets/vets.module';
       password: 'mariposa',
       database: 'minniedb',
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
       logging: true,
     }),
     PetsModule,
