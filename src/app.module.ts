@@ -8,11 +8,11 @@ import { VetsModule } from './vets/vets.module';
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
+      host: '127.0.0.1',
       port: 5432,
-      username: 'postgres',
+      username: 'minniedb',
       password: 'mariposa',
-      database: 'MinnieDB',
+      database: 'minniedb',
       autoLoadEntities: true,
       synchronize: true,
       logging: true,
