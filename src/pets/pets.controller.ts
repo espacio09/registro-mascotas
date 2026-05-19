@@ -29,14 +29,14 @@ export class PetsController {
   @Post()
   create(@Body() createPetDto: CreatePetDto) {
     return this.petsService.create(createPetDto);
-  }  
+  }
 
   @Put(':id')
   update(@Param('id') id: string, @Body() updatePetDto: UpdatePetDto) {
     return this.petsService.update(Number(id), updatePetDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string, @Body() deletePetDto: DeletePetDto) {{
-    return this.petsService.remove(Number(id), deletePetDto);
-  }}
+  @Delete(':id') remove(@Param('id') id: string) {
+    return this.petsService.remove(Number(id));
+  }
+}
