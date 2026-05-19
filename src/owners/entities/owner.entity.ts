@@ -1,19 +1,20 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Pet } from '../pets/entities/pet.entity.ts';
 
-@Entity()
-export class OwnerEntity {
+@Entity('owners')
+export class Owner {
   @PrimaryGeneratedColumn()
   id!: number;
 
   @Column()
-  name!: string;
+  firstName!: string;
 
   @Column()
-  address!: string;
+  lastName!: string;
 
   @Column()
-  phonenumber!: string;
+  email!: string;
 
-  @Column({ nullable: true })
-  email?: string;
+  @OneToMany(() => Pet, (pet) => pet.owner)
+  pets!: Pet[];
 }

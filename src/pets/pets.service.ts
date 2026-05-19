@@ -35,16 +35,23 @@ export class PetsService {
   }
 
   //  CREATE
+  async create(dto: CreatePetDto) {
+    const { name, age, type, breed, ownerId } = dto;
 
-  async create(createPetDto: CreatePetDto) {
-    const pet = this.petRepository.create(createPetDto);
+    const owner = await this.petRepository.findOneBy({ id: ownerId });
+
+    if (!owner) {
+      throw new Error('Owner no existe');
+    }
+
+    const pet = this.petRepository.create({
+      name,
+      age,
+      type,
+      breed,
+      owner, // 🔥 clave
+    });
+
     return this.petRepository.save(pet);
-}
-
-
-  //  DELETE
-  async remove(id: number) {
-    const pet = await this.findOne(id);
-    return await this.petRepository.remove(pet);
   }
 }

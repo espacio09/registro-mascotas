@@ -10,6 +10,7 @@ import {
 import { PetsService } from './pets.service';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
+import { DeletePetDto } from './dto/delete-pet.dto';
 
 @Controller('pets')
 export class PetsController {
@@ -28,7 +29,7 @@ export class PetsController {
   @Post()
   create(@Body() createPetDto: CreatePetDto) {
     return this.petsService.create(createPetDto);
-  }
+  }  
 
   @Put(':id')
   update(@Param('id') id: string, @Body() updatePetDto: UpdatePetDto) {
@@ -36,7 +37,6 @@ export class PetsController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.petsService.remove(Number(id));
-  }
-}
+  remove(@Param('id') id: string, @Body() deletePetDto: DeletePetDto) {{
+    return this.petsService.remove(Number(id), deletePetDto);
+  }}

@@ -1,4 +1,4 @@
-export class UpdatePetDto {
+export class DeletePetDto {
   petId!: number;
   name!: string;
   age!: number;
