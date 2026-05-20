@@ -1,8 +1,8 @@
 export class CreatePetDto {
   petId!: number;
-  name!: string;
-  age!: number;
-  type!: string;
-  breed!: string;
+  pet_name!: string;
+  pet_typeId!: number;
+  breed_id!: number;
+  birthdate!: Date;
   ownerId!: number;
 }

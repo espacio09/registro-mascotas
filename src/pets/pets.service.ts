@@ -1,87 +1,105 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Pet } from './entities/pet.entity';
-import { Owner } from '@owners/entities/owner.entity';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Pool } from 'pg';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
+import { Pet } from './interfaces/pets.interfaces';
+
+const pool = new Pool({
+  host: '127.0.0.1',
+  port: 5432,
+  user: 'minniedb',
+  password: 'mariposa',
+  database: 'minniedb',
+});
 
 @Injectable()
 export class PetsService {
-  constructor(
-    @InjectRepository(Pet)
-    private petRepository: Repository<Pet>,
+  async createPet(data: CreatePetDto): Promise<Pet> {
+    const query = `
+      INSERT INTO pets (
+        pet_name,
+        pet_type_id,
+        breed_id,
+        birthdate,
+        owner_id
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *;
+    `;
 
-    @InjectRepository(Owner)
-    private ownerRepository: Repository<Owner>,
-  ) {}
+    const values = [
+      data.pet_name,
+      data.pet_typeId,
+      data.breed_id,
+      new Date(data.birthdate),
+      data.ownerId,
+    ];
 
-  // READ ALL
-  async findAll() {
-    return this.petRepository.find({
-      relations: ['owner'], // 🔥 opcional pero recomendable
-    });
+    const { rows } = await pool.query<Pet>(query, values);
+    return rows[0];
   }
 
-  // READ ONE
-  async findOne(id: number) {
-    const pet = await this.petRepository.findOne({
-      where: { id },
-      relations: ['owner'], // 🔥 opcional
-    });
+  async findAll(): Promise<Pet[]> {
+    const { rows } = await pool.query<Pet>('SELECT * FROM pets');
+    return rows;
+  }
 
-    if (!pet) {
-      throw new NotFoundException('Pet not found!');
+  async findOne(id: number): Promise<Pet> {
+    const { rows } = await pool.query<Pet>(
+      'SELECT * FROM pets WHERE pet_id = $1',
+      [id],
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Pet no encontrado');
     }
 
-    return pet;
+    return rows[0];
   }
 
-  // CREATE ✅ (ya arreglado)
+  async update(id: number, data: UpdatePetDto): Promise<Pet> {
+    const query = `
+      UPDATE pets
+      SET
+        pet_name = $1,
+        pet_type_id = $2,
+        breed_id = $3,
+        birthdate = $4,
+        owner_id = $5
+      WHERE pet_id = $6
+      RETURNING *;
+    `;
 
-  async create(dto: CreatePetDto): Promise<Pet> {
-    console.log('DTO:', dto);
+    const values = [
+      data.pet_name,
+      data.pet_typeId,
+      data.breed_id,
+      data.birthdate,
+      data.ownerId,
+      id,
+    ];
 
-    const ownerId = Number(dto.ownerId);
+    const { rows } = await pool.query<Pet>(query, values);
 
-    console.log('Parsed ownerId:', ownerId);
-
-    if (isNaN(ownerId)) {
-      throw new BadRequestException('ownerId inválido');
+    if (rows.length === 0) {
+      throw new NotFoundException('Pet no encontrado');
     }
 
-    const owner = await this.ownerRepository.findOneBy({});
+    return rows[0];
+  }
 
-    console.log('OWNER FOUND:', owner);
+  async remove(id: number): Promise<{ message: string }> {
+    const { rows } = await pool.query<Pet>(
+      'DELETE FROM pets WHERE pet_id = $1 RETURNING *',
+      [id],
+    );
 
-    if (!owner) {
-      throw new NotFoundException('Owner no existe');
+    if (rows.length === 0) {
+      throw new NotFoundException('Pet no encontrado');
     }
-    const pet = this.petRepository.create({
-      name: dto.name,
-      age: dto.age,
-      type: dto.type,
-      breed: dto.breed,
-      owner,
-    });
 
-    return await this.petRepository.save(pet);
-  }
-
-  // UPDATE
-  async update(id: number, dto: UpdatePetDto): Promise<Pet> {
-    const pet = await this.findOne(id);
-    Object.assign(pet, dto);
-    return this.petRepository.save(pet);
-  }
-
-  // DELETE simple (mejorado)
-  async remove(id: number): Promise<void> {
-    const pet = await this.findOne(id);
-    await this.petRepository.remove(pet);
+    return {
+      message: '✅ Pet eliminado',
+    };
   }
 }

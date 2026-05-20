@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": "./",
-    "ignoreDeprecations": "5.0",
+    "ignoreDeprecations": "",
     "paths": {
       "@owners/entities/owner.entity": ["src/owners/entities/owner.entity"],
       "@pets/entities/pet.entity": ["src/pets/entities/pet.entity"],

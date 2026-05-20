@@ -1,8 +1,8 @@
 export class DeletePetDto {
-  pet_id!: number;
-  name!: string;
-  age!: number;
-  type!: string;
-  breed!: string;
-  owner_id!: number;
+  petId!: number;
+  pet_name!: string;
+  pet_typeId!: number;
+  breed_id!: number;
+  birthdate!: Date;
+  ownerId!: number;
 }
