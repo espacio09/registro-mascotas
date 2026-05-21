@@ -1,8 +1,23 @@
+import { IsString, IsDateString, IsOptional, IsInt } from 'class-validator';
+
 export class UpdatePetDto {
-  petId!: number;
+  @IsOptional()
+  @IsString()
   pet_name!: string;
-  pet_typeId!: number;
-  breed_id!: number;
-  birthdate!: Date;
+
+  @IsOptional()
+  @IsDateString()
+  birthdate!: string;
+
+  @IsOptional()
+  @IsInt()
   ownerId!: number;
+
+  @IsOptional()
+  @IsInt()
+  breed_id!: number;
+
+  @IsOptional()
+  @IsInt()
+  pet_typeId!: number;
 }

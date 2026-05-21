@@ -14,6 +14,8 @@ const pool = new Pool({
 
 @Injectable()
 export class PetsService {
+
+  // ✅ CREATE
   async createPet(data: CreatePetDto): Promise<Pet> {
     const query = `
       INSERT INTO pets (
@@ -39,11 +41,13 @@ export class PetsService {
     return rows[0];
   }
 
+  // ✅ GET ALL (sin error)
   async findAll(): Promise<Pet[]> {
     const { rows } = await pool.query<Pet>('SELECT * FROM pets');
     return rows;
   }
 
+  // ✅ GET ONE BY ID
   async findOne(id: number): Promise<Pet> {
     const { rows } = await pool.query<Pet>(
       'SELECT * FROM pets WHERE pet_id = $1',
@@ -51,51 +55,103 @@ export class PetsService {
     );
 
     if (rows.length === 0) {
-      throw new NotFoundException('Pet no encontrado');
+      throw new NotFoundException(`Pet ${id} no encontrado`);
     }
 
     return rows[0];
   }
 
-  async update(id: number, data: UpdatePetDto): Promise<Pet> {
+  // ✅ SEARCH DINÁMICO (lo que querías 👀🔥)
+  async search(filters: {
+    petId?: number;
+    petName?: string;
+    ownerId?: number;
+  }): Promise<Pet[]> {
+
+    let query = 'SELECT * FROM pets WHERE 1=1';
+    const values: any[] = [];
+
+    if (filters.petId) {
+      values.push(filters.petId);
+      query += ` AND pet_id = $${values.length}`;
+    }
+
+    if (filters.petName) {
+      values.push(filters.petName);
+      query += ` AND pet_name ILIKE $${values.length}`;
+    }
+
+    if (filters.ownerId) {
+      values.push(filters.ownerId);
+      query += ` AND owner_id = $${values.length}`;
+    }
+
+    const { rows } = await pool.query<Pet>(query, values);
+
+    return rows;
+  }
+
+  // ✅ PATCH REAL (dinámico 🔥)
+  async updatePet(id: number, data: UpdatePetDto): Promise<Pet> {
+    const fields: string[] = [];
+    const values: (string | number | Date)[] = [];
+
+    if (data.pet_name !== undefined) {
+      values.push(data.pet_name);
+      fields.push(`pet_name = $${values.length}`);
+    }
+
+    if (data.pet_typeId !== undefined) {
+  values.push(data.pet_typeId);
+  fields.push(`pet_type_id = $${values.length}`);
+    }
+
+    if (data.breed_id !== undefined) {
+      values.push(data.breed_id);
+      fields.push(`breed_id = $${values.length}`);
+    }
+
+    if (data.birthdate !== undefined) {
+      values.push(data.birthdate);
+      fields.push(`birthdate = $${values.length}`);
+    }
+
+    if (data.ownerId !== undefined) {
+      values.push(data.ownerId);
+      fields.push(`owner_id = $${values.length}`);
+    }
+
+    if (fields.length === 0) {
+      throw new Error('No fields to update');
+    }
+
+    values.push(id);
+
     const query = `
       UPDATE pets
-      SET
-        pet_name = $1,
-        pet_type_id = $2,
-        breed_id = $3,
-        birthdate = $4,
-        owner_id = $5
-      WHERE pet_id = $6
+      SET ${fields.join(', ')}
+      WHERE pet_id = $${values.length}
       RETURNING *;
     `;
-
-    const values = [
-      data.pet_name,
-      data.pet_typeId,
-      data.breed_id,
-      data.birthdate,
-      data.ownerId,
-      id,
-    ];
 
     const { rows } = await pool.query<Pet>(query, values);
 
     if (rows.length === 0) {
-      throw new NotFoundException('Pet no encontrado');
+      throw new NotFoundException(`Pet ${id} no encontrado`);
     }
 
     return rows[0];
   }
 
-  async remove(id: number): Promise<{ message: string }> {
-    const { rows } = await pool.query<Pet>(
+  // ✅ DELETE
+  async removePet(id: number): Promise<{ message: string }> {
+    const { rows } = await pool.query(
       'DELETE FROM pets WHERE pet_id = $1 RETURNING *',
       [id],
     );
 
     if (rows.length === 0) {
-      throw new NotFoundException('Pet no encontrado');
+      throw new NotFoundException(`Pet ${id} no encontrado`);
     }
 
     return {

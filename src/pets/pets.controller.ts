@@ -1,9 +1,19 @@
-import { Controller, Get, Post, Put } from '@nestjs/common';
-import { Param, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Query,
+  Param,
+  Body,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { PetsService } from './pets.service';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
 import { Pet } from './interfaces/pets.interfaces';
+import { DeletePetDto } from './dto/delete-pet.dto';
 
 @Controller('pets')
 export class PetsController {
@@ -30,13 +40,26 @@ export class PetsController {
     return this.petsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.petsService.findOne(Number(id));
+  @Get('search')
+  findOne(
+    @Query('petId') petId?: string,
+    @Query('pet_name') petName?: string,
+    @Query('ownerId') ownerId?: string,
+  ): Promise<Pet[]> {
+    return this.petsService.search({
+      petId: petId ? Number(petId) : undefined,
+      petName: petName,
+      ownerId: ownerId ? Number(ownerId) : undefined,
+    });
   }
 
-  @Put(':id')
-  update(@Param('id') id: string, @Body() updatePetDto: UpdatePetDto) {
-    return this.petsService.update(Number(id), updatePetDto);
+  @Patch(':id')
+  updatePet(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePetDto) {
+    return this.petsService.updatePet(id, dto);
+  }
+
+  @Delete(':id')
+  removePet(@Param('id', ParseIntPipe) id: number, @Body() dto: DeletePetDto) {
+    return this.petsService.removePet(id, dto);
   }
 }

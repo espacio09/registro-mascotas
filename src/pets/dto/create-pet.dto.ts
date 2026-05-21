@@ -1,8 +1,30 @@
+import {
+  IsString,
+  IsNotEmpty,
+  IsDateString,
+  IsOptional,
+  IsInt,
+} from 'class-validator';
+
 export class CreatePetDto {
-  petId!: number;
+  @IsString()
+  @IsNotEmpty()
   pet_name!: string;
-  pet_typeId!: number;
-  breed_id!: number;
-  birthdate!: Date;
+
+  // ✅ Validación de fecha
+  @IsOptional()
+  @IsDateString()
+  birthdate!: string;
+
+  // ✅ Validación de número entero
+  @IsInt()
   ownerId!: number;
+
+  @IsOptional()
+  @IsInt()
+  breed_id!: number;
+
+  @IsOptional()
+  @IsInt()
+  pet_typeId!: number;
 }
