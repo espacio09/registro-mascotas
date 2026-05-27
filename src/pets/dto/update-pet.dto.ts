@@ -1,23 +1,44 @@
-import { IsString, IsDateString, IsOptional, IsInt } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreatePetDto } from './create-pet.dto';
 
-export class UpdatePetDto {
+import { IsString, IsOptional, IsInt, IsDateString } from 'class-validator';
+
+export class UpdatePetDto extends PartialType(CreatePetDto) {
   @IsOptional()
   @IsString()
-  pet_name!: string;
+  pet_name?: string;
 
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  sex?: string;
+
+  // ✅ Validación de fecha
   @IsOptional()
   @IsDateString()
-  birthdate!: string;
+  birthdate?: string;
+
+  // ✅ Validación de número entero
+  @IsOptional()
+  @IsInt()
+  ownerId?: number;
 
   @IsOptional()
   @IsInt()
-  ownerId!: number;
+  breed_id?: number;
 
   @IsOptional()
   @IsInt()
-  breed_id!: number;
+  pet_typeId?: number;
 
   @IsOptional()
   @IsInt()
-  pet_typeId!: number;
+  microchip_no?: number;
+
+  @IsOptional()
+  @IsInt()
+  weight?: number;
 }

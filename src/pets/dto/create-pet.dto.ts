@@ -11,20 +11,41 @@ export class CreatePetDto {
   @IsNotEmpty()
   pet_name!: string;
 
+  @IsString()
+  @IsNotEmpty()
+  color!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  sex!: string;
+
   // ✅ Validación de fecha
-  @IsOptional()
   @IsDateString()
+  @IsNotEmpty()
   birthdate!: string;
 
   // ✅ Validación de número entero
   @IsInt()
+  @IsNotEmpty()
   ownerId!: number;
 
   @IsOptional()
   @IsInt()
+  @IsNotEmpty()
   breed_id!: number;
 
   @IsOptional()
   @IsInt()
+  @IsNotEmpty()
   pet_typeId!: number;
+
+  @IsOptional()
+  @IsInt()
+  @IsNotEmpty()
+  microchip_no?: number;
+
+  @IsOptional()
+  @IsInt()
+  @IsNotEmpty()
+  weight?: number;
 }

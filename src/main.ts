@@ -15,9 +15,14 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  await app.listen(3001);
+  //Puerto dinámico para despliegue en plataformas 
+  const port = process.env.PORT || 3002;
+  await app.listen(port);
 
-  console.log('🚀 Server running on http://localhost:3001');
+  console.log(`🚀 Server running on port ${port}`);
+
+
+  console.log('🚀 Server running on http://localhost:' + port);
 }
 
 bootstrap().catch((err) => {

@@ -6,7 +6,11 @@
       "@owners/entities/owner.entity": ["src/owners/entities/owner.entity"],
       "@pets/entities/pet.entity": ["src/pets/entities/pet.entity"],
     },
-    "types": ["jest", "node"],
+  "scripts":{
+  "dev": "nest start --watch",
+  "kill": "npx kill-port 3000 3001"
+  },
+  "types": ["jest", "node"],
     "strict": true,
     "module": "NodeNext",
     "moduleResolution": "nodenext",

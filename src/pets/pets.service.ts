@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
@@ -14,7 +14,6 @@ const pool = new Pool({
 
 @Injectable()
 export class PetsService {
-
   // ✅ CREATE
   async createPet(data: CreatePetDto): Promise<Pet> {
     const query = `
@@ -67,9 +66,12 @@ export class PetsService {
     petName?: string;
     ownerId?: number;
   }): Promise<Pet[]> {
-
     let query = 'SELECT * FROM pets WHERE 1=1';
     const values: any[] = [];
+
+    console.log('petName from query:', filters.petName);
+    console.log('QUERY:', query);
+    console.log('VALUES:', values);
 
     if (filters.petId) {
       values.push(filters.petId);
@@ -77,7 +79,7 @@ export class PetsService {
     }
 
     if (filters.petName) {
-      values.push(filters.petName);
+      values.push(`%${filters.petName}%`);
       query += ` AND pet_name ILIKE $${values.length}`;
     }
 
@@ -91,48 +93,60 @@ export class PetsService {
     return rows;
   }
 
-  // ✅ PATCH REAL (dinámico 🔥)
   async updatePet(id: number, data: UpdatePetDto): Promise<Pet> {
     const fields: string[] = [];
     const values: (string | number | Date)[] = [];
 
-    if (data.pet_name !== undefined) {
-      values.push(data.pet_name);
-      fields.push(`pet_name = $${values.length}`);
+    // ✅ Mapeo DTO → DB
+    const fieldMap: Record<string, string> = {
+      pet_name: 'pet_name',
+      color: 'color',
+      sex: 'sex',
+      birthdate: 'birthdate',
+      ownerId: 'owner_id',
+      microchip_no: 'microchip_no',
+      weight: 'weight',
+      pet_type_id: 'pet_type_id',
+      breed_id: 'breed_id',
+    };
+
+    // ✅ Construcción dinámica
+
+    for (const key of Object.keys(data) as Array<keyof UpdatePetDto>) {
+      const value = data[key];
+
+      if (value !== undefined && fieldMap[key]) {
+        if (key === 'weight') {
+          const numericValue = Number(value);
+
+          if (isNaN(numericValue) || numericValue <= 0) {
+            throw new BadRequestException('Weight must be a positive number');
+          }
+          console.log(key, value, typeof value);
+
+          values.push(numericValue);
+        } else {
+          values.push(value);
+        }
+
+        fields.push(`${fieldMap[key]} = $${values.length}`);
+      }
     }
 
-    if (data.pet_typeId !== undefined) {
-  values.push(data.pet_typeId);
-  fields.push(`pet_type_id = $${values.length}`);
-    }
-
-    if (data.breed_id !== undefined) {
-      values.push(data.breed_id);
-      fields.push(`breed_id = $${values.length}`);
-    }
-
-    if (data.birthdate !== undefined) {
-      values.push(data.birthdate);
-      fields.push(`birthdate = $${values.length}`);
-    }
-
-    if (data.ownerId !== undefined) {
-      values.push(data.ownerId);
-      fields.push(`owner_id = $${values.length}`);
-    }
-
+    // ✅ Validación
     if (fields.length === 0) {
       throw new Error('No fields to update');
     }
 
+    // ✅ ID al final
     values.push(id);
 
     const query = `
-      UPDATE pets
-      SET ${fields.join(', ')}
-      WHERE pet_id = $${values.length}
-      RETURNING *;
-    `;
+    UPDATE pets
+    SET ${fields.join(', ')}
+    WHERE pet_id = $${values.length}
+    RETURNING *;
+  `;
 
     const { rows } = await pool.query<Pet>(query, values);
 

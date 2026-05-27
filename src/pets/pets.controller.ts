@@ -13,7 +13,6 @@ import { PetsService } from './pets.service';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
 import { Pet } from './interfaces/pets.interfaces';
-import { DeletePetDto } from './dto/delete-pet.dto';
 
 @Controller('pets')
 export class PetsController {
@@ -35,6 +34,20 @@ export class PetsController {
     }
   }
 
+  @Get('search')
+  search(
+    @Query()
+    query: {
+      petId?: number;
+      petName?: string;
+      ownerId?: number;
+    },
+  ) {
+    console.log('FULL QUERY:', query);
+
+    return this.petsService.search(query);
+  }
+
   @Get()
   findAll(): Promise<Pet[]> {
     return this.petsService.findAll();
@@ -42,14 +55,14 @@ export class PetsController {
 
   @Get('search')
   findOne(
-    @Query('petId') petId?: string,
-    @Query('pet_name') petName?: string,
-    @Query('ownerId') ownerId?: string,
+    @Query('petId') petId?: number,
+    @Query('petName') petName?: string,
+    @Query('ownerId') ownerId?: number,
   ): Promise<Pet[]> {
     return this.petsService.search({
-      petId: petId ? Number(petId) : undefined,
+      petId: petId,
       petName: petName,
-      ownerId: ownerId ? Number(ownerId) : undefined,
+      ownerId: ownerId,
     });
   }
 
@@ -59,7 +72,7 @@ export class PetsController {
   }
 
   @Delete(':id')
-  removePet(@Param('id', ParseIntPipe) id: number, @Body() dto: DeletePetDto) {
-    return this.petsService.removePet(id, dto);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.petsService.removePet(id);
   }
 }
