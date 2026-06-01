@@ -5,23 +5,22 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  // ✅ ACTIVAR VALIDACIÓN GLOBAL
+  // ✅ ACTIVAR CORS (ESTO FALTABA)
+  app.enableCors();
 
+  // ✅ VALIDACIÓN
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // elimina campos no permitidos
-      forbidNonWhitelisted: true, // error si mandan campos extra
-      transform: true, // convierte tipos automáticamente
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
     }),
   );
 
-  //Puerto dinámico para despliegue en plataformas 
   const port = process.env.PORT || 3002;
   await app.listen(port);
 
   console.log(`🚀 Server running on port ${port}`);
-
-
   console.log('🚀 Server running on http://localhost:' + port);
 }
 
