@@ -19,7 +19,7 @@ export class UpdatePetDto extends PartialType(CreatePetDto) {
   // ✅ Validación de fecha
   @IsOptional()
   @IsDateString()
-  birthdate?: string;
+  birthdate?: Date;
 
   // ✅ Validación de número entero
   @IsOptional()

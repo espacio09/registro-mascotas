@@ -22,7 +22,7 @@ export class CreatePetDto {
   // ✅ Validación de fecha
   @IsDateString()
   @IsNotEmpty()
-  birthdate!: string;
+  birthdate!: Date;
 
   // ✅ Validación de número entero
   @IsInt()

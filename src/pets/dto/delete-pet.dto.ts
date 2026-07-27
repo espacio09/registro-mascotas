@@ -14,7 +14,7 @@ export class DeletePetDto {
   // ✅ Validación de fecha
   @IsOptional()
   @IsDateString()
-  birthdate!: string;
+  birthdate!: Date;
 
   // ✅ Validación de número entero
   @IsInt()
