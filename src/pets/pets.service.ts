@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Pool } from 'pg';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
@@ -22,9 +26,12 @@ export class PetsService {
         pet_type_id,
         breed_id,
         birthdate,
-        owner_id
+        owner_id,
+        color,
+        sex,
+        microchip_no,
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *;
     `;
 
@@ -34,6 +41,9 @@ export class PetsService {
       data.breed_id,
       new Date(data.birthdate),
       data.ownerId,
+      data.color,
+      data.sex,
+      data.microchip_no,
     ];
 
     const { rows } = await pool.query<Pet>(query, values);
@@ -106,11 +116,11 @@ export class PetsService {
       ownerId: 'owner_id',
       microchip_no: 'microchip_no',
       weight: 'weight',
-      pet_type_id: 'pet_type_id',
+      pet_typeId: 'pet_type_id',
       breed_id: 'breed_id',
     };
 
-    // ✅ Construcción dinámica
+    // ✅ Construcción dinámica de update
 
     for (const key of Object.keys(data) as Array<keyof UpdatePetDto>) {
       const value = data[key];
