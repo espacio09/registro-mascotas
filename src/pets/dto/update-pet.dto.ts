@@ -1,7 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreatePetDto } from './create-pet.dto';
 
-import { IsString, IsOptional, IsInt, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsDate } from 'class-validator';
 
 export class UpdatePetDto extends PartialType(CreatePetDto) {
   @IsOptional()
@@ -18,8 +18,8 @@ export class UpdatePetDto extends PartialType(CreatePetDto) {
 
   // ✅ Validación de fecha
   @IsOptional()
-  @IsDateString()
-  birthdate?: string;
+  @IsDate()
+  birthdate?: Date;
 
   // ✅ Validación de número entero
   @IsOptional()
