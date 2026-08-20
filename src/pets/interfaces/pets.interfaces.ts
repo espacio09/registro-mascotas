@@ -4,4 +4,5 @@ export interface Pet {
   breed_id: number;
   birth_date: Date;
   owner_id: number;
+  ownerId: number;
 }

@@ -29,7 +29,7 @@ export class PetsService {
         owner_id,
         color,
         sex,
-        microchip_no,
+        microchip_no
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *;
@@ -47,13 +47,13 @@ export class PetsService {
     ];
 
     const { rows } = await pool.query<Pet>(query, values);
-    return rows[0];
+    return this.toApiPet(rows[0]);
   }
 
   // ✅ GET ALL (sin error)
   async findAll(): Promise<Pet[]> {
     const { rows } = await pool.query<Pet>('SELECT * FROM pets');
-    return rows;
+    return rows.map((pet) => this.toApiPet(pet));
   }
 
   // ✅ GET ONE BY ID
@@ -67,7 +67,7 @@ export class PetsService {
       throw new NotFoundException(`Pet ${id} no encontrado`);
     }
 
-    return rows[0];
+    return this.toApiPet(rows[0]);
   }
 
   // ✅ SEARCH DINÁMICO (lo que querías 👀🔥)
@@ -100,7 +100,7 @@ export class PetsService {
 
     const { rows } = await pool.query<Pet>(query, values);
 
-    return rows;
+    return rows.map((pet) => this.toApiPet(pet));
   }
 
   async updatePet(id: number, data: UpdatePetDto): Promise<Pet> {
@@ -164,7 +164,14 @@ export class PetsService {
       throw new NotFoundException(`Pet ${id} no encontrado`);
     }
 
-    return rows[0];
+    return this.toApiPet(rows[0]);
+  }
+
+  private toApiPet(pet: Pet): Pet {
+    return {
+      ...pet,
+      ownerId: pet.owner_id,
+    };
   }
 
   // ✅ DELETE
