@@ -1,18 +1,30 @@
 import { Injectable } from '@nestjs/common';
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  host: '127.0.0.1',
+  port: 5432,
+  user: 'minniedb',
+  password: 'mariposa',
+  database: 'minniedb',
+});
 
 @Injectable()
 export class OwnersService {
-  private owners = [
-    { id: 1, name: 'Tatjana', email: 'tatja@example.com' },
-    { id: 2, name: 'Sabine', email: 'sabin@example.com' },
-    { id: 3, name: 'Luna', email: 'luna@example.com' },
-  ];
+  async findAll() {
+    const { rows } = await pool.query(
+      'SELECT * FROM owners',
+    );
 
-  findAll() {
-    return this.owners;
+    return rows;
   }
 
-  findOne(id: number) {
-    return this.owners.find((owner) => owner.id === id);
+  async findOne(id: number) {
+    const { rows } = await pool.query(
+      'SELECT * FROM owners WHERE id = $1',
+      [id],
+    );
+
+    return rows[0];
   }
 }
