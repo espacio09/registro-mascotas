@@ -6,12 +6,16 @@ export class OwnersController {
   constructor(private readonly ownersService: OwnersService) {}
 
   @Get()
-  getAllOwners() {
-    return this.ownersService.findAll();
+  async getAllOwners() {
+    const owners = await this.ownersService.findAll();
+
+    console.log(JSON.stringify(owners, null, 2));
+
+    return owners;
   }
 
   @Get(':id')
-  getOwnerById(@Param('id') id: string) {
-    return this.ownersService.findOne(Number(id));
+  getOwnerById(@Param('id') owner_id: string) {
+    return this.ownersService.findOne(Number(owner_id));
   }
 }
