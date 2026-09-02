@@ -1,69 +1,50 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Query,
-  Param,
   Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
   ParseIntPipe,
+  Patch,
+  Post,
+  Query,
 } from '@nestjs/common';
-import { PetsService } from './pets.service';
+
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
 import { Pet } from './interfaces/pets.interfaces';
+import { PetsService } from './pets.service';
 
 @Controller('pets')
 export class PetsController {
   constructor(private readonly petsService: PetsService) {}
 
   @Post()
-  async createPet(@Body() body: CreatePetDto) {
-    try {
-      const createPetDto: CreatePetDto = body;
-      return await this.petsService.createPet(createPetDto);
-    } catch (err: unknown) {
-      console.error('❌ FULL ERROR:', err);
-
-      return {
-        statusCode: 500,
-        message: 'Error servidor',
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
-  }
-
-  @Get('search')
-  search(
-    @Query()
-    query: {
-      petId?: number;
-      petName?: string;
-      ownerId?: number;
-    },
-  ) {
-    console.log('FULL QUERY:', query);
-
-    return this.petsService.search(query);
+  async createPet(@Body() body: CreatePetDto): Promise<Pet> {
+    return this.petsService.createPet(body);
   }
 
   @Get()
-  findAll(): Promise<Pet[]> {
+  async findAll(): Promise<Pet[]> {
     return this.petsService.findAll();
   }
 
   @Get('search')
-  findOne(
-    @Query('petId') petId?: number,
+  search(
+    @Query('petId') petId?: string,
     @Query('petName') petName?: string,
-    @Query('ownerId') ownerId?: number,
-  ): Promise<Pet[]> {
+    @Query('ownerId') ownerId?: string,
+  ) {
     return this.petsService.search({
-      petId: petId,
-      petName: petName,
-      ownerId: ownerId,
+      petId: petId ? Number(petId) : undefined,
+      petName: petName || undefined,
+      ownerId: ownerId ? Number(ownerId) : undefined,
     });
+  }
+
+  @Get(':id')
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Pet> {
+    return this.petsService.findOne(id);
   }
 
   @Patch(':id')
