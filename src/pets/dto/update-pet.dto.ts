@@ -1,7 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreatePetDto } from './create-pet.dto';
 
-import { IsString, IsOptional, IsInt, IsDate, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsDate, IsNotEmpty, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdatePetDto extends PartialType(CreatePetDto) {
@@ -45,7 +45,7 @@ export class UpdatePetDto extends PartialType(CreatePetDto) {
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsNumber({ maxDecimalPlaces: 2 })
   weight?: number;
 
   @IsOptional()

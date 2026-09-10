@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsOptional,
   IsInt,
+  IsNumber,
 } from 'class-validator';
 
 export class CreatePetDto {
@@ -45,8 +46,7 @@ export class CreatePetDto {
   microchip_no?: number;
 
   @IsOptional()
-  @IsInt()
-  @IsNotEmpty()
+  @IsNumber({ maxDecimalPlaces: 2 })
   weight?: number;
 
   @IsOptional()
