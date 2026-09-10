@@ -3,7 +3,7 @@ export class PetDto {
   petName!: string;
   petTypeId!: number;
   birthDate!: Date;
-  microchipNo!: number;
+  microchip_no!: number;
   age!: number;
   sex!: string | null;
   color!: string | null;

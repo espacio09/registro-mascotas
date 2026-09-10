@@ -48,7 +48,6 @@ export class UpdatePetDto extends PartialType(CreatePetDto) {
   @IsInt()
   weight?: number;
 
-
   @IsOptional()
   @Type(() => Number)
   @IsInt()
