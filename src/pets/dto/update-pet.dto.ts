@@ -1,7 +1,14 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreatePetDto } from './create-pet.dto';
 
-import { IsString, IsOptional, IsInt, IsDate, IsNotEmpty, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  IsDate,
+  IsNotEmpty,
+  IsNumber,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdatePetDto extends PartialType(CreatePetDto) {
@@ -16,6 +23,19 @@ export class UpdatePetDto extends PartialType(CreatePetDto) {
   @IsOptional()
   @IsString()
   sex?: string;
+
+  @IsOptional()
+  @IsString()
+  owner_name?: string;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  owner_birthdate?: Date;
+
+  @IsOptional()
+  @IsString()
+  breed_name?: string;
 
   @IsOptional()
   @Type(() => Date)
@@ -48,8 +68,4 @@ export class UpdatePetDto extends PartialType(CreatePetDto) {
   @IsNumber({ maxDecimalPlaces: 2 })
   weight?: number;
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  age?: number;
 }
