@@ -20,6 +20,57 @@ const pool = new Pool({
 export class PetsService {
   // ✅ CREATE
   async createPet(data: CreatePetDto): Promise<Pet> {
+    const rawOwnerName: unknown = data.owner_name;
+    const ownerName =
+      typeof rawOwnerName === 'string' ? rawOwnerName.trim() : '';
+
+    if (!ownerName) {
+      throw new BadRequestException('Owner name cannot be empty');
+    }
+
+    const [firstName, ...lastNameParts] = ownerName.split(/\s+/);
+    const lastName = lastNameParts.join(' ');
+    const breedName = data.breed_name.trim();
+    let resolvedBreedId: number;
+
+    if (!breedName) {
+      throw new BadRequestException('Breed name cannot be empty');
+    }
+
+    const newOwner = await pool.query<{ owner_id: number }>(
+      `
+        INSERT INTO owners (first_name, last_name)
+        VALUES ($1, $2)
+        RETURNING owner_id
+      `,
+      [firstName, lastName],
+    );
+    const resolvedOwnerId = newOwner.rows[0].owner_id;
+
+    const existingBreed = await pool.query<{ breed_id: number }>(
+      `
+        SELECT breed_id
+        FROM breeds
+        WHERE LOWER(TRIM(breed_name)) = LOWER($1)
+        LIMIT 1
+      `,
+      [breedName],
+    );
+
+    if (existingBreed.rows[0]) {
+      resolvedBreedId = existingBreed.rows[0].breed_id;
+    } else {
+      const newBreed = await pool.query<{ breed_id: number }>(
+        `
+          INSERT INTO breeds (pet_type_id, breed_name)
+          VALUES ($1, $2)
+          RETURNING breed_id
+        `,
+        [data.pet_typeId, breedName],
+      );
+      resolvedBreedId = newBreed.rows[0].breed_id;
+    }
+
     const query = `
       INSERT INTO pets (
         pet_name,
@@ -29,21 +80,23 @@ export class PetsService {
         owner_id,
         color,
         sex,
-        microchip_no
+        microchip_no,
+        weight
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *;
     `;
 
     const values = [
       data.pet_name,
       data.pet_typeId,
-      data.breed_id,
+      resolvedBreedId,
       new Date(data.birthdate),
-      data.ownerId,
+      resolvedOwnerId,
       data.color,
       data.sex,
       data.microchip_no,
+      data.weight,
     ];
 
     const { rows } = await pool.query<Pet>(query, values);
@@ -158,9 +211,8 @@ export class PetsService {
         throw new BadRequestException('Owner name cannot be empty');
       }
 
-      const ownerNameParts = ownerName.split(/\s+/);
-      const firstName = ownerNameParts.shift() ?? '';
-      const lastName = ownerNameParts.join(' ');
+      const [firstName, ...lastNameParts] = ownerName.split(/\s+/);
+      const lastName = lastNameParts.join(' ');
 
       if (data.owner_id !== undefined) {
         const ownerResult = await pool.query<{ owner_id: number }>(
@@ -172,14 +224,25 @@ export class PetsService {
           throw new NotFoundException(`Owner ${data.owner_id} no encontrado`);
         }
 
-        await pool.query(
-          `
-            UPDATE owners
-            SET first_name = $1, last_name = $2, birthdate = $4
-            WHERE owner_id = $3
-          `,
-          [firstName, lastName, data.owner_id, data.owner_birthdate],
-        );
+        if (data.owner_birthdate !== undefined) {
+          await pool.query(
+            `
+              UPDATE owners
+              SET first_name = $1, last_name = $2, birthdate = $4
+              WHERE owner_id = $3
+            `,
+            [firstName, lastName, data.owner_id, data.owner_birthdate],
+          );
+        } else {
+          await pool.query(
+            `
+              UPDATE owners
+              SET first_name = $1, last_name = $2
+              WHERE owner_id = $3
+            `,
+            [firstName, lastName, data.owner_id],
+          );
+        }
         resolvedOwnerId = data.owner_id;
       } else {
         const existingOwner = await pool.query<{ owner_id: number }>(
@@ -188,10 +251,9 @@ export class PetsService {
             FROM owners
             WHERE LOWER(TRIM(first_name)) = LOWER($1)
               AND LOWER(TRIM(last_name)) = LOWER($2)
-              AND birthdate = $3
             LIMIT 1
           `,
-          [firstName, lastName, data.owner_birthdate],
+          [firstName, lastName],
         );
 
         if (existingOwner.rows[0]) {
@@ -199,11 +261,11 @@ export class PetsService {
         } else {
           const newOwner = await pool.query<{ owner_id: number }>(
             `
-              INSERT INTO owners (first_name, last_name, birthdate)
-              VALUES ($1, $2, $3)
+              INSERT INTO owners (first_name, last_name)
+              VALUES ($1, $2)
               RETURNING owner_id
             `,
-            [firstName, lastName, data.owner_birthdate],
+            [firstName, lastName],
           );
           resolvedOwnerId = newOwner.rows[0].owner_id;
         }

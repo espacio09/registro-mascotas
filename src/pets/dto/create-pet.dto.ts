@@ -25,15 +25,13 @@ export class CreatePetDto {
   @IsNotEmpty()
   birthdate!: Date;
 
-  // ✅ Validación de número entero
-  @IsInt()
+  @IsString()
   @IsNotEmpty()
-  ownerId!: number;
+  owner_name!: string;
 
-  @IsOptional()
-  @IsInt()
+  @IsString()
   @IsNotEmpty()
-  breed_id!: number;
+  breed_name!: string;
 
   @IsOptional()
   @IsInt()

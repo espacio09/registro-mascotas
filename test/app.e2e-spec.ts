@@ -136,19 +136,17 @@ describe('HTTP API integration (e2e)', () => {
   });
 
   it('/pets (POST)', async () => {
-    const response = await request(app.getHttpServer())
-      .post('/pets')
-      .send({
-        pet_name: 'Luna',
-        pet_typeId: 1,
-        breed_id: 2,
-        birthdate: '2022-05-10',
-        ownerId: 7,
-        color: 'black',
-        sex: 'female',
-        microchip_no: 654321,
-        weight: 8,
-      });
+    const response = await request(app.getHttpServer()).post('/pets').send({
+      pet_name: 'Luna',
+      pet_typeId: 1,
+      breed_id: 2,
+      birthdate: '2022-05-10',
+      ownerId: 7,
+      color: 'black',
+      sex: 'female',
+      microchip_no: 654321,
+      weight: 8,
+    });
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual(
@@ -161,17 +159,15 @@ describe('HTTP API integration (e2e)', () => {
   });
 
   it('/pets/:id (PATCH)', async () => {
-    const response = await request(app.getHttpServer())
-      .patch('/pets/10')
-      .send({
-        pet_name: 'Nala Updated',
-        color: 'gold',
-        sex: 'male',
-        weight: 15,
-        birthdate: '2022-06-15',
-        ownerId: 9,
-        microchip_no: 999888,
-      });
+    const response = await request(app.getHttpServer()).patch('/pets/10').send({
+      pet_name: 'Nala Updated',
+      color: 'gold',
+      sex: 'male',
+      weight: 15,
+      birthdate: '2022-06-15',
+      ownerId: 9,
+      microchip_no: 999888,
+    });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual(
