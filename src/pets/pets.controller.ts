@@ -29,6 +29,11 @@ export class PetsController {
     return this.petsService.findAll();
   }
 
+  @Get('breed-id')
+  findBreedId(@Query('breedName') breedName?: string) {
+    return this.petsService.findBreedId(breedName ?? '');
+  }
+
   @Get('search')
   search(
     @Query('petId') petId?: string,

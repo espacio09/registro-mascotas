@@ -57,7 +57,7 @@ describe('PetsService', () => {
     const service = new PetsService();
     const result = await service.createPet({
       pet_name: 'Nala',
-      owner_name: 'Luca Auer',
+      owner_name: 'Luca Maria Auer',
       breed_name: 'Labrador',
       color: 'white',
       sex: 'female',
@@ -74,7 +74,7 @@ describe('PetsService', () => {
     expect(mockQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('INSERT INTO owners'),
-      ['Luca', 'Auer'],
+      ['Luca Maria', 'Auer'],
     );
     expect(mockQuery).toHaveBeenNthCalledWith(
       3,
@@ -92,6 +92,24 @@ describe('PetsService', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  it('rejects an owner name without a last name', async () => {
+    const service = new PetsService();
+
+    await expect(
+      service.createPet({ owner_name: 'Thomas' } as CreatePetDto),
+    ).rejects.toThrow('Owner last name cannot be empty');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('rejects updating an owner name without a last name', async () => {
+    const service = new PetsService();
+
+    await expect(
+      service.updatePet(10, { owner_name: 'Thomas' }),
+    ).rejects.toThrow('Owner last name cannot be empty');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it('updates an existing owner by name without requiring a birthdate', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [{ owner_id: 7 }] })
@@ -101,7 +119,7 @@ describe('PetsService', () => {
 
     const service = new PetsService();
     const result = await service.updatePet(10, {
-      owner_name: 'Luca Auer',
+      owner_name: 'Luca Maria Auer',
     });
 
     expect(result).toMatchObject({
@@ -109,10 +127,9 @@ describe('PetsService', () => {
       owner_id: 7,
       ownerId: 7,
     });
-    expect(mockQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('FROM owners'),
-      ['Luca', 'Auer'],
+      ['Luca Maria', 'Auer'],
     );
   });
 });

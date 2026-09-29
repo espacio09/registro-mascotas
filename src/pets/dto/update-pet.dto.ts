@@ -67,4 +67,8 @@ export class UpdatePetDto extends PartialType(CreatePetDto) {
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   weight?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

@@ -28,8 +28,14 @@ export class PetsService {
       throw new BadRequestException('Owner name cannot be empty');
     }
 
-    const [firstName, ...lastNameParts] = ownerName.split(/\s+/);
-    const lastName = lastNameParts.join(' ');
+    const nameParts = ownerName.split(/\s+/);
+    const lastName = nameParts.at(-1)!;
+    const firstName = nameParts.slice(0, -1).join(' ');
+
+    if (!firstName || !lastName) {
+      throw new BadRequestException('Owner last name cannot be empty');
+    }
+
     const breedName = data.breed_name.trim();
     let resolvedBreedId: number;
 
@@ -81,9 +87,10 @@ export class PetsService {
         color,
         sex,
         microchip_no,
-        weight
+        weight,
+        notes
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *;
     `;
 
@@ -97,6 +104,7 @@ export class PetsService {
       data.sex,
       data.microchip_no,
       data.weight,
+      data.notes,
     ];
 
     const { rows } = await pool.query<Pet>(query, values);
@@ -116,6 +124,26 @@ export class PetsService {
       LEFT JOIN owners ON owners.owner_id = pets.owner_id
     `);
     return rows.map((pet) => this.toApiPet(pet));
+  }
+
+  async findBreedId(breedName: string): Promise<{ breed_id: number | null }> {
+    const normalizedBreedName = breedName.trim();
+
+    if (!normalizedBreedName) {
+      return { breed_id: null };
+    }
+
+    const { rows } = await pool.query<{ breed_id: number }>(
+      `
+        SELECT breed_id
+        FROM breeds
+        WHERE LOWER(TRIM(breed_name)) = LOWER($1)
+        LIMIT 1
+      `,
+      [normalizedBreedName],
+    );
+
+    return { breed_id: rows[0]?.breed_id ?? null };
   }
 
   // ✅ GET ONE BY ID
@@ -200,6 +228,7 @@ export class PetsService {
       owner_id: 'owner_id',
       microchip_no: 'microchip_no',
       weight: 'weight',
+      notes: 'notes',
       pet_typeId: 'pet_type_id',
       breed_id: 'breed_id',
     };
@@ -211,8 +240,13 @@ export class PetsService {
         throw new BadRequestException('Owner name cannot be empty');
       }
 
-      const [firstName, ...lastNameParts] = ownerName.split(/\s+/);
-      const lastName = lastNameParts.join(' ');
+      const nameParts = ownerName.split(/\s+/);
+      const lastName = nameParts.at(-1)!;
+      const firstName = nameParts.slice(0, -1).join(' ');
+
+      if (!firstName || !lastName) {
+        throw new BadRequestException('Owner last name cannot be empty');
+      }
 
       if (data.owner_id !== undefined) {
         const ownerResult = await pool.query<{ owner_id: number }>(

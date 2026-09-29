@@ -48,6 +48,10 @@ export class CreatePetDto {
   weight?: number;
 
   @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
   @IsInt()
   @IsNotEmpty()
   age?: number;

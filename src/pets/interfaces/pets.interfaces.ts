@@ -9,4 +9,5 @@ export interface Pet {
   owner_name?: string;
   owner_birthdate?: Date;
   breed_name?: string;
+  notes?: string | null;
 }
