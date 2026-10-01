@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -16,10 +17,67 @@ const pool = new Pool({
   database: 'minniedb',
 });
 
+const MICROCHIP_DUPLICATE_MESSAGE =
+  '¡El número de microchip ya existe! Verifique su entrada.';
+
 @Injectable()
 export class PetsService {
+  async isMicrochipAvailable(
+    microchipNo: number,
+    excludePetId?: number,
+  ): Promise<boolean> {
+    const values: number[] = [microchipNo];
+    const excludeCurrentPet = excludePetId !== undefined;
+
+    if (excludeCurrentPet) {
+      values.push(excludePetId);
+    }
+
+    const { rows } = await pool.query<{ pet_id: number }>(
+      `
+        SELECT pet_id
+        FROM pets
+        WHERE microchip_no = $1
+        ${excludeCurrentPet ? 'AND pet_id <> $2' : ''}
+        LIMIT 1
+      `,
+      values,
+    );
+
+    return rows.length === 0;
+  }
+
+  private async assertMicrochipAvailable(
+    microchipNo: number | undefined,
+    excludePetId?: number,
+  ): Promise<void> {
+    if (
+      microchipNo !== undefined &&
+      !(await this.isMicrochipAvailable(microchipNo, excludePetId))
+    ) {
+      throw new ConflictException(MICROCHIP_DUPLICATE_MESSAGE);
+    }
+  }
+
+  private rethrowMicrochipUniqueViolation(error: unknown): never {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23505' &&
+      'constraint' in error &&
+      error.constraint === 'pets_microchip_no_unique'
+    ) {
+      throw new ConflictException(MICROCHIP_DUPLICATE_MESSAGE);
+    }
+
+    throw error;
+  }
+
   // ✅ CREATE
   async createPet(data: CreatePetDto): Promise<Pet> {
+    await this.assertMicrochipAvailable(data.microchip_no);
+
     const rawOwnerName: unknown = data.owner_name;
     const ownerName =
       typeof rawOwnerName === 'string' ? rawOwnerName.trim() : '';
@@ -107,8 +165,12 @@ export class PetsService {
       data.notes,
     ];
 
-    const { rows } = await pool.query<Pet>(query, values);
-    return this.toApiPet(rows[0]);
+    try {
+      const { rows } = await pool.query<Pet>(query, values);
+      return this.toApiPet(rows[0]);
+    } catch (error) {
+      this.rethrowMicrochipUniqueViolation(error);
+    }
   }
 
   // ✅ GET ALL (sin error)
@@ -214,6 +276,8 @@ export class PetsService {
   }
 
   async updatePet(id: number, data: UpdatePetDto): Promise<Pet> {
+    await this.assertMicrochipAvailable(data.microchip_no, id);
+
     const fields: string[] = [];
     const values: (string | number | Date)[] = [];
     let resolvedBreedId = data.breed_id;
@@ -411,7 +475,12 @@ export class PetsService {
     RETURNING *;
   `;
 
-    const { rows } = await pool.query<Pet>(query, values);
+    let rows: Pet[];
+    try {
+      ({ rows } = await pool.query<Pet>(query, values));
+    } catch (error) {
+      this.rethrowMicrochipUniqueViolation(error);
+    }
 
     if (rows.length === 0) {
       throw new NotFoundException(`Pet ${id} no encontrado`);

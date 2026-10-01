@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
+import { UpdateOwnerDto } from './dto/update-owner.dto';
 
 const pool = new Pool({
   host: '127.0.0.1',
@@ -13,6 +14,7 @@ export interface OwnerWithPets {
   owner_id: number;
   first_name: string;
   last_name: string;
+  address?: string;
   email?: string;
   phone?: string;
   pets: Record<string, unknown>[];
@@ -52,5 +54,31 @@ GROUP BY o.owner_id;`,
     );
 
     return rows[0] as OwnerWithPets | undefined;
+  }
+
+  async update(id: number, owner: UpdateOwnerDto) {
+    const result = await pool.query(
+      `UPDATE owners
+       SET first_name = $1,
+           last_name = $2,
+           address = $3,
+           email = NULLIF($4, ''),
+           phone = $5
+       WHERE owner_id = $6`,
+      [
+        owner.first_name,
+        owner.last_name,
+        owner.address,
+        owner.email ?? '',
+        owner.phone,
+        id,
+      ],
+    );
+
+    if (!result.rowCount) {
+      throw new NotFoundException(`Propietario ${id} no encontrado.`);
+    }
+
+    return this.findOne(id);
   }
 }

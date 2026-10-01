@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -32,6 +33,30 @@ export class PetsController {
   @Get('breed-id')
   findBreedId(@Query('breedName') breedName?: string) {
     return this.petsService.findBreedId(breedName ?? '');
+  }
+
+  @Get('microchip-availability')
+  async checkMicrochipAvailability(
+    @Query('microchipNo', ParseIntPipe) microchipNo: number,
+    @Query('excludePetId') excludePetId?: string,
+  ): Promise<{ available: boolean }> {
+    const excludedPetId =
+      excludePetId === undefined ? undefined : Number(excludePetId);
+
+    if (
+      microchipNo <= 0 ||
+      (excludedPetId !== undefined &&
+        (!Number.isInteger(excludedPetId) || excludedPetId <= 0))
+    ) {
+      throw new BadRequestException('Invalid microchip number or pet ID');
+    }
+
+    return {
+      available: await this.petsService.isMicrochipAvailable(
+        microchipNo,
+        excludedPetId,
+      ),
+    };
   }
 
   @Get('search')

@@ -5,4 +5,5 @@ export class CreateOwnerDto {
   address!: string;
   email!: string;
   phone!: string;
+  notes!: string;
 }

@@ -127,6 +127,7 @@ describe('PetsService', () => {
       owner_id: 7,
       ownerId: 7,
     });
+    expect(mockQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('FROM owners'),
       ['Luca Maria', 'Auer'],
