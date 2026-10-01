@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
+import { CreateOwnerDto } from './dto/create-owner.dto';
 import { UpdateOwnerDto } from './dto/update-owner.dto';
 
 const pool = new Pool({
@@ -56,6 +57,23 @@ GROUP BY o.owner_id;`,
     return rows[0] as OwnerWithPets | undefined;
   }
 
+  async create(owner: CreateOwnerDto) {
+    const { rows } = await pool.query<{ owner_id: number }>(
+      `INSERT INTO owners (first_name, last_name, address, email, phone)
+       VALUES ($1, $2, $3, NULLIF($4, ''), $5)
+       RETURNING owner_id`,
+      [
+        owner.first_name,
+        owner.last_name,
+        owner.address,
+        owner.email ?? '',
+        owner.phone,
+      ],
+    );
+
+    return this.findOne(rows[0].owner_id);
+  }
+
   async update(id: number, owner: UpdateOwnerDto) {
     const result = await pool.query(
       `UPDATE owners
@@ -80,5 +98,89 @@ GROUP BY o.owner_id;`,
     }
 
     return this.findOne(id);
+  }
+
+  async remove(id: number) {
+    try {
+      const result = await pool.query<{ owner_id: number }>(
+        'DELETE FROM owners WHERE owner_id = $1 RETURNING owner_id',
+        [id],
+      );
+
+      if (!result.rowCount) {
+        throw new NotFoundException(`Propietario ${id} no encontrado.`);
+      }
+
+      return { owner_id: result.rows[0].owner_id };
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23503'
+      ) {
+        throw new ConflictException(
+          'No se puede eliminar el propietario mientras tenga mascotas asociadas.',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async removeMany(ownerIds: number[]) {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const existingOwners = await client.query<{ owner_id: number }>(
+        'SELECT owner_id FROM owners WHERE owner_id = ANY($1::int[]) FOR UPDATE',
+        [ownerIds],
+      );
+
+      if (existingOwners.rows.length !== ownerIds.length) {
+        throw new NotFoundException('Uno o más propietarios ya no existen.');
+      }
+
+      const ownersWithPets = await client.query<{ owner_id: number }>(
+        'SELECT DISTINCT owner_id FROM pets WHERE owner_id = ANY($1::int[])',
+        [ownerIds],
+      );
+
+      if (ownersWithPets.rows.length > 0) {
+        const blockedIds = ownersWithPets.rows
+          .map((owner) => owner.owner_id)
+          .join(', ');
+        throw new ConflictException(
+          `No se pueden eliminar los propietarios ${blockedIds}: tienen mascotas asociadas.`,
+        );
+      }
+
+      const result = await client.query<{ owner_id: number }>(
+        'DELETE FROM owners WHERE owner_id = ANY($1::int[]) RETURNING owner_id',
+        [ownerIds],
+      );
+
+      await client.query('COMMIT');
+      return { deletedOwnerIds: result.rows.map((owner) => owner.owner_id) };
+    } catch (error) {
+      await client.query('ROLLBACK');
+
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23503'
+      ) {
+        throw new ConflictException(
+          'No se pueden eliminar propietarios mientras tengan mascotas asociadas.',
+        );
+      }
+
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
