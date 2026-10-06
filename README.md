@@ -31,6 +31,13 @@
 $ npm install
 ```
 
+## Database setup
+
+Before using owner deletion, apply
+`sql/20261006_archive_owners_and_pets.sql` to the PostgreSQL database used by the
+backend. It creates the `archivoOwners` and `archivoPets` archive tables and
+links archived pets to their archived owner.
+
 ## Compile and run the project
 
 ```bash

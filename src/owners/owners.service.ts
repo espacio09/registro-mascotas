@@ -101,31 +101,8 @@ GROUP BY o.owner_id;`,
   }
 
   async remove(id: number) {
-    try {
-      const result = await pool.query<{ owner_id: number }>(
-        'DELETE FROM owners WHERE owner_id = $1 RETURNING owner_id',
-        [id],
-      );
-
-      if (!result.rowCount) {
-        throw new NotFoundException(`Propietario ${id} no encontrado.`);
-      }
-
-      return { owner_id: result.rows[0].owner_id };
-    } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === '23503'
-      ) {
-        throw new ConflictException(
-          'No se puede eliminar el propietario mientras tenga mascotas asociadas.',
-        );
-      }
-
-      throw error;
-    }
+    await this.removeMany([id]);
+    return { owner_id: id };
   }
 
   async removeMany(ownerIds: number[]) {
@@ -143,24 +120,42 @@ GROUP BY o.owner_id;`,
         throw new NotFoundException('Uno o más propietarios ya no existen.');
       }
 
-      const ownersWithPets = await client.query<{ owner_id: number }>(
-        'SELECT DISTINCT owner_id FROM pets WHERE owner_id = ANY($1::int[])',
+      await client.query<{ pet_id: number }>(
+        'SELECT pet_id FROM pets WHERE owner_id = ANY($1::int[]) FOR UPDATE',
         [ownerIds],
       );
 
-      if (ownersWithPets.rows.length > 0) {
-        const blockedIds = ownersWithPets.rows
-          .map((owner) => owner.owner_id)
-          .join(', ');
-        throw new ConflictException(
-          `No se pueden eliminar los propietarios ${blockedIds}: tienen mascotas asociadas.`,
-        );
-      }
+      await client.query(
+        `INSERT INTO "archivoOwners"
+         OVERRIDING SYSTEM VALUE
+         SELECT owners.*
+         FROM owners
+         WHERE owner_id = ANY($1::int[])`,
+        [ownerIds],
+      );
+
+      await client.query(
+        `INSERT INTO "archivoPets"
+         OVERRIDING SYSTEM VALUE
+         SELECT pets.*
+         FROM pets
+         WHERE owner_id = ANY($1::int[])`,
+        [ownerIds],
+      );
+
+      await client.query(
+        'DELETE FROM pets WHERE owner_id = ANY($1::int[])',
+        [ownerIds],
+      );
 
       const result = await client.query<{ owner_id: number }>(
         'DELETE FROM owners WHERE owner_id = ANY($1::int[]) RETURNING owner_id',
         [ownerIds],
       );
+
+      if (result.rows.length !== ownerIds.length) {
+        throw new NotFoundException('Uno o más propietarios ya no existen.');
+      }
 
       await client.query('COMMIT');
       return { deletedOwnerIds: result.rows.map((owner) => owner.owner_id) };
@@ -174,7 +169,18 @@ GROUP BY o.owner_id;`,
         error.code === '23503'
       ) {
         throw new ConflictException(
-          'No se pueden eliminar propietarios mientras tengan mascotas asociadas.',
+          'No se pudieron archivar y eliminar los propietarios porque otros registros dependen de sus mascotas.',
+        );
+      }
+
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23505'
+      ) {
+        throw new ConflictException(
+          'El archivo ya contiene registros con los mismos identificadores; no se eliminó ningún dato.',
         );
       }
 
