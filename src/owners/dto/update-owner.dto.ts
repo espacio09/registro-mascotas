@@ -29,6 +29,7 @@ export class UpdateOwnerDto {
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   email?: string;
 
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)

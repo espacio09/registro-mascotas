@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS "archivoOwners" (
+CREATE TABLE IF NOT EXISTS archivo_owners (
   LIKE owners
     INCLUDING DEFAULTS
     INCLUDING GENERATED
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS "archivoOwners" (
     INCLUDING COMMENTS
 );
 
-CREATE TABLE IF NOT EXISTS "archivoPets" (
+CREATE TABLE IF NOT EXISTS archivo_pets (
   LIKE pets
     INCLUDING DEFAULTS
     INCLUDING GENERATED
@@ -41,21 +41,21 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conrelid = format('%I.%I', source_schema, 'archivoOwners')::regclass
+    WHERE conrelid = format('%I.%I', source_schema, 'archivo_owners')::regclass
       AND contype = 'p'
   ) THEN
-    ALTER TABLE "archivoOwners"
-      ADD CONSTRAINT "archivoOwners_pkey" PRIMARY KEY (owner_id);
+    ALTER TABLE archivo_owners
+      ADD CONSTRAINT archivo_owners_pkey PRIMARY KEY (owner_id);
   END IF;
 
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conrelid = format('%I.%I', source_schema, 'archivoPets')::regclass
+    WHERE conrelid = format('%I.%I', source_schema, 'archivo_pets')::regclass
       AND contype = 'p'
   ) THEN
-    ALTER TABLE "archivoPets"
-      ADD CONSTRAINT "archivoPets_pkey" PRIMARY KEY (pet_id);
+    ALTER TABLE archivo_pets
+      ADD CONSTRAINT archivo_pets_pkey PRIMARY KEY (pet_id);
   END IF;
 
   FOR source_fk IN
@@ -64,9 +64,14 @@ BEGIN
     WHERE constraint_row.contype = 'f'
       AND constraint_row.conrelid IN ('owners'::regclass, 'pets'::regclass)
   LOOP
+    IF source_fk.conrelid = 'pets'::regclass
+      AND source_fk.confrelid = 'owners'::regclass THEN
+      CONTINUE;
+    END IF;
+
     archive_table := CASE
-      WHEN source_fk.conrelid = 'owners'::regclass THEN 'archivoOwners'
-      ELSE 'archivoPets'
+      WHEN source_fk.conrelid = 'owners'::regclass THEN 'archivo_owners'
+      ELSE 'archivo_pets'
     END;
     archive_relation := format('%I.%I', source_schema, archive_table);
     constraint_name := format('archivo_fk_%s', source_fk.oid);
@@ -95,9 +100,9 @@ BEGIN
       AND attribute.attnum = key.attnum;
 
     IF source_fk.confrelid = 'owners'::regclass THEN
-      referenced_relation := format('%I.%I', source_schema, 'archivoOwners');
+      referenced_relation := format('%I.%I', source_schema, 'archivo_owners');
     ELSIF source_fk.confrelid = 'pets'::regclass THEN
-      referenced_relation := format('%I.%I', source_schema, 'archivoPets');
+      referenced_relation := format('%I.%I', source_schema, 'archivo_pets');
     ELSE
       SELECT format('%I.%I', namespace.nspname, referenced_table.relname)
       INTO referenced_relation
@@ -150,27 +155,24 @@ BEGIN
     );
   END LOOP;
 
-  IF NOT EXISTS (
-    SELECT 1
+  FOR source_fk IN
+    SELECT constraint_row.conname
     FROM pg_constraint AS constraint_row
     WHERE constraint_row.conrelid =
-        format('%I.%I', source_schema, 'archivoPets')::regclass
+        format('%I.%I', source_schema, 'archivo_pets')::regclass
       AND constraint_row.contype = 'f'
       AND constraint_row.confrelid =
-        format('%I.%I', source_schema, 'archivoOwners')::regclass
-      AND constraint_row.conkey = ARRAY[
-        (
-          SELECT attribute.attnum
-          FROM pg_attribute AS attribute
-          WHERE attribute.attrelid =
-              format('%I.%I', source_schema, 'archivoPets')::regclass
-            AND attribute.attname = 'owner_id'
-        )
-      ]::smallint[]
-  ) THEN
-    ALTER TABLE "archivoPets"
-      ADD CONSTRAINT "archivoPets_owner_id_fkey"
-      FOREIGN KEY (owner_id)
-      REFERENCES "archivoOwners" (owner_id);
-  END IF;
+        format('%I.%I', source_schema, 'archivo_owners')::regclass
+  LOOP
+    EXECUTE format(
+      'ALTER TABLE %I.%I DROP CONSTRAINT %I',
+      source_schema,
+      'archivo_pets',
+      source_fk.conname
+    );
+  END LOOP;
 END $$;
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE archivo_owners, archivo_pets
+  TO minniedb;

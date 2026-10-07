@@ -19,6 +19,36 @@ const pool = new Pool({
 
 const MICROCHIP_DUPLICATE_MESSAGE =
   '¡El número de microchip ya existe! Verifique su entrada.';
+const PET_ARCHIVE_TABLES_ERROR =
+  'No se pueden archivar mascotas porque falta la tabla archivo_pets. Aplica la migración backend/sql/20261006_archive_owners_and_pets.sql y vuelve a intentarlo.';
+const PET_ARCHIVE_PERMISSIONS_ERROR =
+  'El usuario de la aplicación no tiene permisos para archivar mascotas. Ejecuta los GRANT de backend/sql/20261006_archive_owners_and_pets.sql con un usuario administrador de PostgreSQL.';
+
+function getPetArchiveError(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return undefined;
+  }
+
+  if (
+    error.code === '42P01' &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    /archivo_owners|archivo_pets/.test(error.message)
+  ) {
+    return PET_ARCHIVE_TABLES_ERROR;
+  }
+
+  if (
+    error.code === '42501' &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    /archivo_owners|archivo_pets/.test(error.message)
+  ) {
+    return PET_ARCHIVE_PERMISSIONS_ERROR;
+  }
+
+  return undefined;
+}
 
 @Injectable()
 export class PetsService {
@@ -175,16 +205,26 @@ export class PetsService {
 
   // ✅ GET ALL (sin error)
   async findAll(): Promise<Pet[]> {
-    const { rows } = await pool.query<Pet>(`
-      SELECT
-        pets.*,
-        breeds.breed_name,
-        CONCAT(owners.first_name, ' ', owners.last_name) AS owner_name,
-        owners.birthdate AS owner_birthdate
-      FROM pets
-      LEFT JOIN breeds ON breeds.breed_id = pets.breed_id
-      LEFT JOIN owners ON owners.owner_id = pets.owner_id
-    `);
+    let rows: Pet[];
+    try {
+      ({ rows } = await pool.query<Pet>(`
+        SELECT
+          pets.*,
+          breeds.breed_name,
+          CONCAT(owners.first_name, ' ', owners.last_name) AS owner_name,
+          owners.birthdate AS owner_birthdate
+        FROM pets
+        LEFT JOIN breeds ON breeds.breed_id = pets.breed_id
+        LEFT JOIN owners ON owners.owner_id = pets.owner_id
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM archivo_pets archived
+          WHERE archived.pet_id = pets.pet_id
+        )
+      `));
+    } catch (error) {
+      this.rethrowPetArchiveError(error);
+    }
     return rows.map((pet) => this.toApiPet(pet));
   }
 
@@ -210,8 +250,10 @@ export class PetsService {
 
   // ✅ GET ONE BY ID
   async findOne(id: number): Promise<Pet> {
-    const { rows } = await pool.query<Pet>(
-      `
+    let rows: Pet[];
+    try {
+      ({ rows } = await pool.query<Pet>(
+        `
         SELECT
           pets.*,
           breeds.breed_name,
@@ -221,9 +263,17 @@ export class PetsService {
         LEFT JOIN breeds ON breeds.breed_id = pets.breed_id
         LEFT JOIN owners ON owners.owner_id = pets.owner_id
         WHERE pets.pet_id = $1
+          AND NOT EXISTS (
+            SELECT 1
+            FROM archivo_pets archived
+            WHERE archived.pet_id = pets.pet_id
+          )
       `,
-      [id],
-    );
+        [id],
+      ));
+    } catch (error) {
+      this.rethrowPetArchiveError(error);
+    }
 
     if (rows.length === 0) {
       throw new NotFoundException(`Pet ${id} no encontrado`);
@@ -247,7 +297,11 @@ export class PetsService {
       FROM pets
       LEFT JOIN breeds ON breeds.breed_id = pets.breed_id
       LEFT JOIN owners ON owners.owner_id = pets.owner_id
-      WHERE 1=1
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM archivo_pets archived
+        WHERE archived.pet_id = pets.pet_id
+      )
     `;
     const values: any[] = [];
 
@@ -270,7 +324,12 @@ export class PetsService {
       query += ` AND owner_id = $${values.length}`;
     }
 
-    const { rows } = await pool.query<Pet>(query, values);
+    let rows: Pet[];
+    try {
+      ({ rows } = await pool.query<Pet>(query, values));
+    } catch (error) {
+      this.rethrowPetArchiveError(error);
+    }
 
     return rows.map((pet) => this.toApiPet(pet));
   }
@@ -496,19 +555,83 @@ export class PetsService {
     };
   }
 
+  private rethrowPetArchiveError(error: unknown): never {
+    const archiveError = getPetArchiveError(error);
+    if (archiveError) {
+      throw new ConflictException(archiveError);
+    }
+    throw error;
+  }
+
   // ✅ DELETE
   async removePet(id: number): Promise<{ message: string }> {
-    const { rows } = await pool.query(
-      'DELETE FROM pets WHERE pet_id = $1 RETURNING *',
-      [id],
-    );
+    const client = await pool.connect();
 
-    if (rows.length === 0) {
-      throw new NotFoundException(`Pet ${id} no encontrado`);
+    try {
+      await client.query('BEGIN');
+
+      const existingPet = await client.query<{ pet_id: number }>(
+        'SELECT pet_id FROM pets WHERE pet_id = $1 FOR UPDATE',
+        [id],
+      );
+
+      if (existingPet.rows.length === 0) {
+        throw new NotFoundException(`Pet ${id} no encontrado`);
+      }
+
+      await client.query(
+        `INSERT INTO archivo_pets
+         OVERRIDING SYSTEM VALUE
+         SELECT pets.*
+         FROM pets
+         WHERE pet_id = $1`,
+        [id],
+      );
+
+      const result = await client.query<{ pet_id: number }>(
+        'DELETE FROM pets WHERE pet_id = $1 RETURNING pet_id',
+        [id],
+      );
+
+      if (result.rows.length === 0) {
+        throw new NotFoundException(`Pet ${id} no encontrado`);
+      }
+
+      await client.query('COMMIT');
+      return { message: 'Mascota archivada y eliminada.' };
+    } catch (error) {
+      await client.query('ROLLBACK');
+
+      const archiveError = getPetArchiveError(error);
+      if (archiveError) {
+        throw new ConflictException(archiveError);
+      }
+
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23505'
+      ) {
+        throw new ConflictException(
+          'El archivo ya contiene una mascota con el mismo identificador; no se eliminó ningún dato.',
+        );
+      }
+
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23503'
+      ) {
+        throw new ConflictException(
+          'No se pudo archivar la mascota porque otros registros dependen de ella.',
+        );
+      }
+
+      throw error;
+    } finally {
+      client.release();
     }
-
-    return {
-      message: '✅ Pet eliminado',
-    };
   }
 }

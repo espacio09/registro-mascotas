@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -12,6 +13,10 @@ export class CreateOwnerDto {
   @IsOptional()
   @IsInt()
   ownerId?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  confirm_duplicate_name?: boolean;
 
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
@@ -29,6 +34,7 @@ export class CreateOwnerDto {
   address!: string;
 
   @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsEmail({}, { message: 'Correo electrónico no válido.' })
   email?: string;
 
