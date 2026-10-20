@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 
 import { CreatePetDto } from './dto/create-pet.dto';
+import { DeletePetsDto } from './dto/delete-pets.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
 import { Pet } from './interfaces/pets.interfaces';
 import { PetsService } from './pets.service';
@@ -28,6 +29,11 @@ export class PetsController {
   @Get()
   async findAll(): Promise<Pet[]> {
     return this.petsService.findAll();
+  }
+
+  @Delete()
+  deletePets(@Body() body: DeletePetsDto) {
+    return this.petsService.removeManyPets(body.petIds);
   }
 
   @Get('breed-id')

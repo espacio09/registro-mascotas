@@ -565,40 +565,71 @@ export class PetsService {
 
   // ✅ DELETE
   async removePet(id: number): Promise<{ message: string }> {
+    await this.removeManyPets([id]);
+    return { message: 'Mascota archivada y eliminada.' };
+  }
+
+  async removeManyPets(petIds: number[]): Promise<{ deletedPetIds: number[] }> {
     const client = await pool.connect();
 
     try {
       await client.query('BEGIN');
 
-      const existingPet = await client.query<{ pet_id: number }>(
-        'SELECT pet_id FROM pets WHERE pet_id = $1 FOR UPDATE',
-        [id],
+      const existingPets = await client.query<{ pet_id: number }>(
+        'SELECT pet_id FROM pets WHERE pet_id = ANY($1::int[]) FOR UPDATE',
+        [petIds],
       );
 
-      if (existingPet.rows.length === 0) {
-        throw new NotFoundException(`Pet ${id} no encontrado`);
+      const existingPetIds = new Set(
+        existingPets.rows.map((pet) => Number(pet.pet_id)),
+      );
+      const missingPetIds = petIds.filter((petId) => !existingPetIds.has(petId));
+      if (missingPetIds.length > 0) {
+        throw new NotFoundException(
+          `No se encontraron las mascotas seleccionadas con ID: ${missingPetIds.join(', ')}. Actualiza la lista e inténtalo de nuevo.`,
+        );
       }
 
-      await client.query(
+      const archivedPets = await client.query<{ pet_id: number }>(
         `INSERT INTO archivo_pets
          OVERRIDING SYSTEM VALUE
          SELECT pets.*
          FROM pets
-         WHERE pet_id = $1`,
-        [id],
+         WHERE pet_id = ANY($1::int[])
+         RETURNING pet_id`,
+        [petIds],
       );
 
-      const result = await client.query<{ pet_id: number }>(
-        'DELETE FROM pets WHERE pet_id = $1 RETURNING pet_id',
-        [id],
+      const archivedPetIds = new Set(
+        archivedPets.rows.map((pet) => Number(pet.pet_id)),
       );
+      const petsMissingFromArchive = petIds.filter(
+        (petId) => !archivedPetIds.has(petId),
+      );
+      if (petsMissingFromArchive.length > 0) {
+        throw new ConflictException(
+          `No se archivaron todas las mascotas seleccionadas. IDs no copiados: ${petsMissingFromArchive.join(', ')}.`,
+        );
+      }
 
-      if (result.rows.length === 0) {
-        throw new NotFoundException(`Pet ${id} no encontrado`);
+      const deletedPets = await client.query<{ pet_id: number }>(
+        'DELETE FROM pets WHERE pet_id = ANY($1::int[]) RETURNING pet_id',
+        [petIds],
+      );
+      const deletedPetIds = new Set(
+        deletedPets.rows.map((pet) => Number(pet.pet_id)),
+      );
+      const petsNotDeleted = petIds.filter(
+        (petId) => !deletedPetIds.has(petId),
+      );
+      if (petsNotDeleted.length > 0) {
+        throw new ConflictException(
+          `No se eliminaron las mascotas con ID: ${petsNotDeleted.join(', ')}. La operación se canceló y no se archivó ningún registro.`,
+        );
       }
 
       await client.query('COMMIT');
-      return { message: 'Mascota archivada y eliminada.' };
+      return { deletedPetIds: deletedPets.rows.map((pet) => Number(pet.pet_id)) };
     } catch (error) {
       await client.query('ROLLBACK');
 

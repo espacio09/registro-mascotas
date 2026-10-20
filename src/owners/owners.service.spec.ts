@@ -1,16 +1,37 @@
-const mockQuery = jest.fn();
-const mockClientQuery = jest.fn();
-const mockRelease = jest.fn();
-const mockConnect = jest.fn();
+import { vi } from 'vitest';
+import { OwnersService } from './owners.service';
 
-jest.mock('pg', () => ({
-  Pool: jest.fn(() => ({
-    query: mockQuery,
-    connect: mockConnect,
-  })),
+const mockQuery = vi.hoisted(() => vi.fn());
+const mockConnect = vi.hoisted(() => vi.fn());
+const mockClientQuery = vi.hoisted(() => vi.fn());
+const mockRelease = vi.hoisted(() => vi.fn());
+
+vi.mock('pg', () => ({
+  Pool: class {
+    query = mockQuery;
+
+    connect = mockConnect.mockImplementation(() =>
+      Promise.resolve({
+        query: mockClientQuery,
+        release: mockRelease,
+      }),
+    );
+  },
 }));
 
-import { OwnersService } from './owners.service';
+describe('OwnersService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockConnect.mockResolvedValue({
+      query: mockClientQuery,
+      release: mockRelease,
+     });
+
+    mockRelease.mockImplementation(() => {});
+  });
+
+
 
 describe('OwnersService', () => {
   beforeEach(() => {

@@ -1,30 +1,42 @@
-const mockQuery = jest.fn();
-const mockClientQuery = jest.fn();
-const mockRelease = jest.fn();
-const mockConnect = jest.fn();
-
-jest.mock('pg', () => ({
-  Pool: jest.fn(() => ({
-    query: mockQuery,
-    connect: mockConnect,
-  })),
-}));
-
+import { vi } from 'vitest';
 import { PetsService } from './pets.service';
 import { BadRequestException } from '@nestjs/common';
 import { CreatePetDto } from './dto/create-pet.dto';
 
+const mockQuery = vi.hoisted(() => vi.fn());
+const mockConnect = vi.hoisted(() => vi.fn());
+const mockClientQuery = vi.hoisted(() => vi.fn());
+const mockRelease = vi.hoisted(() => vi.fn());
+
+vi.mock('pg', () => ({
+  Pool: class {
+    query = mockQuery;
+
+    connect = mockConnect.mockImplementation(() =>
+      Promise.resolve({
+        query: mockClientQuery,
+        release: mockRelease,
+      }),
+    );
+  },
+}));
+
 describe('PetsService', () => {
   beforeEach(() => {
-    mockQuery.mockReset();
-    mockClientQuery.mockReset();
-    mockRelease.mockReset();
-    mockConnect.mockReset();
+    vi.clearAllMocks();
+
     mockConnect.mockResolvedValue({
       query: mockClientQuery,
       release: mockRelease,
-    });
+     });
+
+    mockRelease.mockImplementation(() => {});
   });
+
+  it('maps owner_id from the DB to ownerId in the API contract', async () => {
+    // ...
+  });
+});
 
   it('maps owner_id from the DB to ownerId in the API contract', async () => {
     mockQuery.mockResolvedValue({
@@ -152,7 +164,7 @@ describe('PetsService', () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ pet_id: 10 }] })
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ pet_id: 10 }] })
       .mockResolvedValueOnce({ rows: [{ pet_id: 10 }] })
       .mockResolvedValueOnce({ rows: [] });
 
@@ -162,12 +174,59 @@ describe('PetsService', () => {
     expect(result).toEqual({ message: 'Mascota archivada y eliminada.' });
     expect(mockClientQuery.mock.calls.map(([query]) => query.trim())).toEqual([
       'BEGIN',
-      'SELECT pet_id FROM pets WHERE pet_id = $1 FOR UPDATE',
+      'SELECT pet_id FROM pets WHERE pet_id = ANY($1::int[]) FOR UPDATE',
       expect.stringContaining('INSERT INTO archivo_pets'),
-      'DELETE FROM pets WHERE pet_id = $1 RETURNING pet_id',
+      'DELETE FROM pets WHERE pet_id = ANY($1::int[]) RETURNING pet_id',
       'COMMIT',
     ]);
     expect(mockClientQuery).toHaveBeenNthCalledWith(3, expect.any(String), [10]);
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('archives and removes all selected pets in one transaction', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ pet_id: 10 }, { pet_id: 11 }] })
+      .mockResolvedValueOnce({ rows: [{ pet_id: 10 }, { pet_id: 11 }] })
+      .mockResolvedValueOnce({ rows: [{ pet_id: 10 }, { pet_id: 11 }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const service = new PetsService();
+    const result = await service.removeManyPets([10, 11]);
+
+    expect(result).toEqual({ deletedPetIds: [10, 11] });
+    expect(mockClientQuery.mock.calls.map(([query]) => query.trim())).toEqual([
+      'BEGIN',
+      'SELECT pet_id FROM pets WHERE pet_id = ANY($1::int[]) FOR UPDATE',
+      expect.stringContaining('INSERT INTO archivo_pets'),
+      'DELETE FROM pets WHERE pet_id = ANY($1::int[]) RETURNING pet_id',
+      'COMMIT',
+    ]);
+    expect(mockClientQuery).toHaveBeenNthCalledWith(3, expect.any(String), [10, 11]);
+    expect(mockClientQuery).toHaveBeenNthCalledWith(
+      4,
+      expect.any(String),
+      [10, 11],
+    );
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not archive or remove any pets when a selected ID is missing', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ pet_id: 10 }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const service = new PetsService();
+
+    await expect(service.removeManyPets([10, 11])).rejects.toThrow(
+      'No se encontraron las mascotas seleccionadas con ID: 11.',
+    );
+    expect(mockClientQuery.mock.calls.map(([query]) => query.trim())).toEqual([
+      'BEGIN',
+      'SELECT pet_id FROM pets WHERE pet_id = ANY($1::int[]) FOR UPDATE',
+      'ROLLBACK',
+    ]);
     expect(mockRelease).toHaveBeenCalledTimes(1);
   });
 
