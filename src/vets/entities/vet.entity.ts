@@ -1,19 +1,28 @@
 import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity()
+@Entity('veterinarians')
 export class VetEntity {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({ name: 'vet_id' })
   id!: number;
 
-  @Column()
-  name!: string;
+  @Column({ name: 'first_name' })
+  firstName!: string;
 
-  @Column()
-  address!: string;
+  @Column({ name: 'last_name' })
+  lastName!: string;
 
-  @Column()
-  phonenumber!: string;
+  @Column({ type: 'varchar', nullable: true })
+  street?: string | null;
 
-  @Column({ nullable: true })
-  email?: string;
+  @Column({ type: 'varchar', nullable: true })
+  address?: string | null;
+
+  @Column({ name: 'phone', type: 'varchar' })
+  phone!: string;
+
+  @Column({ type: 'varchar' })
+  email!: string;
+
+  @Column({ name: 'specialization', nullable: true })
+  specialty?: string;
 }

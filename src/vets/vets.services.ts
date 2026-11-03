@@ -1,57 +1,156 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateVetDto } from './dto/create-vet.dto';
 import { UpdateVetDto } from './dto/update-vet.dto';
+import { VetEntity } from './entities/vet.entity';
 
-export interface Vet {
-  id: number;
-  name?: string;
-  specialty?: string;
-  firstName?: string;
-  lastName?: string;
-  address?: string;
-  email?: string;
-  phoneNumber?: string;
+const DUPLICATE_VET_EMAIL_MESSAGE =
+  'Ya existe un veterinario registrado con este correo electrónico.';
+const DUPLICATE_VET_PHONE_MESSAGE =
+  'Ya existe un veterinario registrado con este teléfono.';
+
+function isDuplicateVetFieldError(error: unknown, constraint: string): boolean {
+  if (typeof error !== 'object' || error === null || !('driverError' in error)) {
+    return false;
+  }
+
+  const driverError = error.driverError;
+  return (
+    typeof driverError === 'object' &&
+    driverError !== null &&
+    'code' in driverError &&
+    driverError.code === '23505' &&
+    'constraint' in driverError &&
+    driverError.constraint === constraint
+  );
 }
 
 @Injectable()
 export class VetsServices {
-  private vets: Vet[] = [
-    { id: 1, name: 'Dr. Willems', specialty: 'General Practice' },
-    { id: 2, name: 'Dr. Johnson', specialty: 'Allergy' },
-    { id: 3, name: 'Dr. Norton', specialty: 'Surgery' },
-  ];
+  constructor(
+    @InjectRepository(VetEntity)
+    private readonly vetsRepository: Repository<VetEntity>,
+  ) {}
 
-  findAll() {
-    return this.vets;
+  findAll(): Promise<VetEntity[]> {
+    return this.vetsRepository.find({ order: { id: 'ASC' } });
   }
 
-  findOne(id: number) {
-    return this.vets.find((vet) => vet.id === id);
-  }
+  async findOne(id: number): Promise<VetEntity> {
+    const vet = await this.vetsRepository.findOneBy({ id });
+    if (!vet) {
+      throw new NotFoundException(`Veterinario ${id} no encontrado.`);
+    }
 
-  create(createVetDto: CreateVetDto) {
-    const id = Math.max(0, ...this.vets.map((vet) => vet.id)) + 1;
-    const vet: Vet = { id, ...createVetDto };
-    this.vets.push(vet);
     return vet;
   }
 
-  update(id: number, updateVetDto: UpdateVetDto) {
-    const vetIndex = this.vets.findIndex((vet) => vet.id === id);
-    if (vetIndex === -1) {
-      throw new NotFoundException(`Veterinario ${id} no encontrado.`);
-    }
+  async create(createVetDto: CreateVetDto): Promise<VetEntity> {
+    const email = createVetDto.email.trim();
+    const phone = createVetDto.phoneNumber.trim();
+    await this.ensureContactDetailsAreUnique(email, phone);
 
-    this.vets[vetIndex] = { ...this.vets[vetIndex], ...updateVetDto };
-    return this.vets[vetIndex];
+    const vet = this.vetsRepository.create({
+      firstName: createVetDto.firstName,
+      lastName: createVetDto.lastName,
+      street: createVetDto.street?.trim() || null,
+      address: createVetDto.address?.trim() || null,
+      email,
+      phone,
+    });
+
+    try {
+      return await this.vetsRepository.save(vet);
+    } catch (error) {
+      if (isDuplicateVetFieldError(error, 'veterinarians_email_unique')) {
+        throw new ConflictException(DUPLICATE_VET_EMAIL_MESSAGE);
+      }
+      if (isDuplicateVetFieldError(error, 'veterinarians_phone_unique')) {
+        throw new ConflictException(DUPLICATE_VET_PHONE_MESSAGE);
+      }
+      throw error;
+    }
   }
 
-  remove(id: number) {
-    const vetIndex = this.vets.findIndex((vet) => vet.id === id);
-    if (vetIndex === -1) {
-      throw new NotFoundException(`Veterinario ${id} no encontrado.`);
+  async update(id: number, updateVetDto: UpdateVetDto): Promise<VetEntity> {
+    const vet = await this.findOne(id);
+    const email = updateVetDto.email?.trim();
+    const phone = updateVetDto.phoneNumber?.trim();
+    await this.ensureContactDetailsAreUnique(email, phone, id);
+
+    if (updateVetDto.firstName !== undefined) {
+      vet.firstName = updateVetDto.firstName;
+    }
+    if (updateVetDto.lastName !== undefined) {
+      vet.lastName = updateVetDto.lastName;
+    }
+    if (updateVetDto.street !== undefined) {
+      vet.street = updateVetDto.street.trim() || null;
+    }
+    if (updateVetDto.address !== undefined) {
+      vet.address = updateVetDto.address.trim() || null;
+    }
+    if (updateVetDto.email !== undefined) {
+      vet.email = updateVetDto.email.trim();
+    }
+    if (updateVetDto.phoneNumber !== undefined) {
+      vet.phone = updateVetDto.phoneNumber.trim();
     }
 
-    return this.vets.splice(vetIndex, 1)[0];
+    try {
+      return await this.vetsRepository.save(vet);
+    } catch (error) {
+      if (isDuplicateVetFieldError(error, 'veterinarians_email_unique')) {
+        throw new ConflictException(DUPLICATE_VET_EMAIL_MESSAGE);
+      }
+      if (isDuplicateVetFieldError(error, 'veterinarians_phone_unique')) {
+        throw new ConflictException(DUPLICATE_VET_PHONE_MESSAGE);
+      }
+      throw error;
+    }
+  }
+
+  private async ensureContactDetailsAreUnique(
+    email?: string,
+    phone?: string,
+    vetId?: number,
+  ): Promise<void> {
+    if (email) {
+      const emailQuery = this.vetsRepository
+        .createQueryBuilder('vet')
+        .where('LOWER(BTRIM(vet.email)) = LOWER(:email)', { email })
+        .andWhere('vet.email IS NOT NULL');
+      if (vetId !== undefined) {
+        emailQuery.andWhere('vet.id <> :vetId', { vetId });
+      }
+
+      if (await emailQuery.getOne()) {
+        throw new ConflictException(DUPLICATE_VET_EMAIL_MESSAGE);
+      }
+    }
+
+    if (phone) {
+      const phoneQuery = this.vetsRepository
+        .createQueryBuilder('vet')
+        .where('BTRIM(vet.phone) = :phone', { phone });
+      if (vetId !== undefined) {
+        phoneQuery.andWhere('vet.id <> :vetId', { vetId });
+      }
+
+      if (await phoneQuery.getOne()) {
+        throw new ConflictException(DUPLICATE_VET_PHONE_MESSAGE);
+      }
+    }
+  }
+
+  async remove(id: number): Promise<VetEntity> {
+    const vet = await this.findOne(id);
+    await this.vetsRepository.remove(vet);
+    return vet;
   }
 }
