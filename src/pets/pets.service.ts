@@ -1,9 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
+
 import { Pool } from 'pg';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
@@ -99,6 +102,15 @@ export class PetsService {
       error.constraint === 'pets_microchip_no_unique'
     ) {
       throw new ConflictException(MICROCHIP_DUPLICATE_MESSAGE);
+    }
+
+    throw error;
+  }
+
+  private rethrowPetArchiveError(error: unknown): never {
+    const archiveError = getPetArchiveError(error);
+    if (archiveError) {
+      throw new ConflictException(archiveError);
     }
 
     throw error;
@@ -205,9 +217,8 @@ export class PetsService {
 
   // ✅ GET ALL (sin error)
   async findAll(): Promise<Pet[]> {
-    let rows: Pet[];
     try {
-      ({ rows } = await pool.query<Pet>(`
+      const { rows } = await pool.query<Pet>(`
         SELECT
           pets.*,
           breeds.breed_name,
@@ -221,11 +232,11 @@ export class PetsService {
           FROM archivo_pets archived
           WHERE archived.pet_id = pets.pet_id
         )
-      `));
+      `);
+      return rows.map((pet) => this.toApiPet(pet));
     } catch (error) {
       this.rethrowPetArchiveError(error);
     }
-    return rows.map((pet) => this.toApiPet(pet));
   }
 
   async findBreedId(breedName: string): Promise<{ breed_id: number | null }> {
@@ -250,9 +261,8 @@ export class PetsService {
 
   // ✅ GET ONE BY ID
   async findOne(id: number): Promise<Pet> {
-    let rows: Pet[];
     try {
-      ({ rows } = await pool.query<Pet>(
+      const { rows } = await pool.query<Pet>(
         `
         SELECT
           pets.*,
@@ -268,22 +278,33 @@ export class PetsService {
             FROM archivo_pets archived
             WHERE archived.pet_id = pets.pet_id
           )
-      `,
+        `,
         [id],
-      ));
+      );
+
+      if (rows.length === 0) {
+        throw new NotFoundException(`Pet ${id} no encontrado`);
+      }
+
+      return this.toApiPet(rows[0]);
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       this.rethrowPetArchiveError(error);
     }
+  }
 
-    if (rows.length === 0) {
-      throw new NotFoundException(`Pet ${id} no encontrado`);
-    }
-
-    return this.toApiPet(rows[0]);
+  private toApiPet(pet: Pet): Pet {
+    return {
+      ...pet,
+      ownerId: pet.owner_id,
+    };
   }
 
   // ✅ SEARCH DINÁMICO (lo que querías 👀🔥)
-  async search(filters: {
+ async search(filters: {
     petId?: number;
     petName?: string;
     ownerId?: number;
@@ -303,11 +324,7 @@ export class PetsService {
         WHERE archived.pet_id = pets.pet_id
       )
     `;
-    const values: any[] = [];
-
-    console.log('petName from query:', filters.petName);
-    console.log('QUERY:', query);
-    console.log('VALUES:', values);
+    const values: (number | string)[] = [];
 
     if (filters.petId) {
       values.push(filters.petId);
@@ -334,234 +351,231 @@ export class PetsService {
     return rows.map((pet) => this.toApiPet(pet));
   }
 
-  async updatePet(id: number, data: UpdatePetDto): Promise<Pet> {
-    await this.assertMicrochipAvailable(data.microchip_no, id);
-
-    const fields: string[] = [];
-    const values: (string | number | Date)[] = [];
-    let resolvedBreedId = data.breed_id;
-    let resolvedOwnerId = data.owner_id;
 
     // ✅ Mapeo DTO → DB
-    const fieldMap: Record<string, string> = {
-      pet_name: 'pet_name',
-      color: 'color',
-      sex: 'sex',
-      birthdate: 'birthdate',
-      owner_id: 'owner_id',
-      microchip_no: 'microchip_no',
-      weight: 'weight',
-      notes: 'notes',
-      pet_typeId: 'pet_type_id',
-      breed_id: 'breed_id',
-    };
 
-    if (data.owner_name !== undefined) {
-      const ownerName = data.owner_name.trim();
+   // ✅ UPDATE
+async updatePet(
+  id: number,
+  data: UpdatePetDto,
+): Promise<Pet> {
+  await this.assertMicrochipAvailable(data.microchip_no, id);
 
-      if (!ownerName) {
-        throw new BadRequestException('Owner name cannot be empty');
+  let resolvedOwnerId: number | undefined = data.owner_id;
+  let resolvedBreedId: number | undefined = data.breed_id;
+
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  const fieldMap: Record<string, string> = {
+    pet_name: 'pet_name',
+    color: 'color',
+    sex: 'sex',
+    birthdate: 'birthdate',
+    owner_id: 'owner_id',
+    microchip_no: 'microchip_no',
+    weight: 'weight',
+    notes: 'notes',
+    pet_typeId: 'pet_type_id',
+    breed_id: 'breed_id',
+  };
+
+  if (data.owner_name !== undefined) {
+    const ownerName = data.owner_name.trim();
+
+    if (!ownerName) {
+      throw new BadRequestException('Owner name cannot be empty');
+    }
+
+    const nameParts = ownerName.split(/\s+/);
+    const lastName = nameParts.at(-1)!;
+    const firstName = nameParts.slice(0, -1).join(' ');
+
+    if (!firstName || !lastName) {
+      throw new BadRequestException('Owner last name cannot be empty');
+    }
+
+    if (data.owner_id !== undefined) {
+      const ownerResult = await pool.query<{ owner_id: number }>(
+        'SELECT owner_id FROM owners WHERE owner_id = $1',
+        [data.owner_id],
+      );
+
+      if (!ownerResult.rows[0]) {
+        throw new NotFoundException(`Owner ${data.owner_id} no encontrado`);
       }
 
-      const nameParts = ownerName.split(/\s+/);
-      const lastName = nameParts.at(-1)!;
-      const firstName = nameParts.slice(0, -1).join(' ');
-
-      if (!firstName || !lastName) {
-        throw new BadRequestException('Owner last name cannot be empty');
-      }
-
-      if (data.owner_id !== undefined) {
-        const ownerResult = await pool.query<{ owner_id: number }>(
-          'SELECT owner_id FROM owners WHERE owner_id = $1',
-          [data.owner_id],
-        );
-
-        if (!ownerResult.rows[0]) {
-          throw new NotFoundException(`Owner ${data.owner_id} no encontrado`);
-        }
-
-        if (data.owner_birthdate !== undefined) {
-          await pool.query(
-            `
-              UPDATE owners
-              SET first_name = $1, last_name = $2, birthdate = $4
-              WHERE owner_id = $3
-            `,
-            [firstName, lastName, data.owner_id, data.owner_birthdate],
-          );
-        } else {
-          await pool.query(
-            `
-              UPDATE owners
-              SET first_name = $1, last_name = $2
-              WHERE owner_id = $3
-            `,
-            [firstName, lastName, data.owner_id],
-          );
-        }
-        resolvedOwnerId = data.owner_id;
-      } else {
-        const existingOwner = await pool.query<{ owner_id: number }>(
+      if (data.owner_birthdate !== undefined) {
+        await pool.query(
           `
-            SELECT owner_id
-            FROM owners
-            WHERE LOWER(TRIM(first_name)) = LOWER($1)
-              AND LOWER(TRIM(last_name)) = LOWER($2)
-            LIMIT 1
+            UPDATE owners
+            SET first_name = $1,
+                last_name = $2,
+                birthdate = $4
+            WHERE owner_id = $3
+          `,
+          [firstName, lastName, data.owner_id, data.owner_birthdate],
+        );
+      } else {
+        await pool.query(
+          `
+            UPDATE owners
+            SET first_name = $1,
+                last_name = $2
+            WHERE owner_id = $3
+          `,
+          [firstName, lastName, data.owner_id],
+        );
+      }
+
+      resolvedOwnerId = data.owner_id;
+    } else {
+      const existingOwner = await pool.query<{ owner_id: number }>(
+        `
+          SELECT owner_id
+          FROM owners
+          WHERE LOWER(TRIM(first_name)) = LOWER($1)
+            AND LOWER(TRIM(last_name)) = LOWER($2)
+          LIMIT 1
+        `,
+        [firstName, lastName],
+      );
+
+      if (existingOwner.rows[0]) {
+        resolvedOwnerId = existingOwner.rows[0].owner_id;
+      } else {
+        const newOwner = await pool.query<{ owner_id: number }>(
+          `
+            INSERT INTO owners (first_name, last_name)
+            VALUES ($1, $2)
+            RETURNING owner_id
           `,
           [firstName, lastName],
         );
 
-        if (existingOwner.rows[0]) {
-          resolvedOwnerId = existingOwner.rows[0].owner_id;
-        } else {
-          const newOwner = await pool.query<{ owner_id: number }>(
-            `
-              INSERT INTO owners (first_name, last_name)
-              VALUES ($1, $2)
-              RETURNING owner_id
-            `,
-            [firstName, lastName],
-          );
-          resolvedOwnerId = newOwner.rows[0].owner_id;
-        }
+        resolvedOwnerId = newOwner.rows[0].owner_id;
       }
     }
+  }
 
-    if (data.breed_name !== undefined) {
-      const breedName = data.breed_name.trim();
+  if (data.breed_name !== undefined) {
+    const breedName = data.breed_name.trim();
 
-      if (!breedName) {
-        throw new BadRequestException('Breed name cannot be empty');
-      }
+    if (!breedName) {
+      throw new BadRequestException('Breed name cannot be empty');
+    }
 
-      const existingBreed = await pool.query<{ breed_id: number }>(
-        `
-          SELECT breed_id
-          FROM breeds
-          WHERE LOWER(TRIM(breed_name)) = LOWER($1)
-          LIMIT 1
-        `,
-        [breedName],
+    const existingBreed = await pool.query<{ breed_id: number }>(
+      `
+        SELECT breed_id
+        FROM breeds
+        WHERE LOWER(TRIM(breed_name)) = LOWER($1)
+        LIMIT 1
+      `,
+      [breedName],
+    );
+
+    if (existingBreed.rows[0]) {
+      resolvedBreedId = existingBreed.rows[0].breed_id;
+    } else {
+      const petResult = await pool.query<{ pet_type_id: number }>(
+        'SELECT pet_type_id FROM pets WHERE pet_id = $1',
+        [id],
       );
 
-      if (existingBreed.rows[0]) {
-        resolvedBreedId = existingBreed.rows[0].breed_id;
+      if (!petResult.rows[0]) {
+        throw new NotFoundException(`Pet ${id} no encontrado`);
+      }
+
+      const petTypeId =
+        data.pet_typeId ?? petResult.rows[0].pet_type_id;
+
+      const newBreed = await pool.query<{ breed_id: number }>(
+        `
+          INSERT INTO breeds (pet_type_id, breed_name)
+          VALUES ($1, $2)
+          RETURNING breed_id
+        `,
+        [petTypeId, breedName],
+      );
+
+      resolvedBreedId = newBreed.rows[0].breed_id;
+    }
+  }
+
+  const updateData =
+    data.breed_name !== undefined || data.owner_name !== undefined
+      ? {
+          ...data,
+          breed_id: resolvedBreedId,
+          owner_id: resolvedOwnerId,
+        }
+      : data;
+
+  for (const key of Object.keys(updateData) as Array<keyof UpdatePetDto>) {
+    const value = updateData[key];
+
+    if (key === 'breed_name' || key === 'owner_name') {
+      continue;
+    }
+
+    if (value !== undefined && fieldMap[key]) {
+      const updateValue =
+        key === 'breed_id'
+          ? resolvedBreedId
+          : key === 'owner_id'
+            ? resolvedOwnerId
+            : value;
+
+      if (updateValue === undefined) {
+        continue;
+      }
+
+      if (key === 'weight') {
+        const numericValue = Number(updateValue);
+
+        if (isNaN(numericValue) || numericValue <= 0) {
+          throw new BadRequestException(
+            'Weight must be a positive number',
+          );
+        }
+
+        values.push(numericValue);
       } else {
-        const petResult = await pool.query<{ pet_type_id: number }>(
-          'SELECT pet_type_id FROM pets WHERE pet_id = $1',
-          [id],
-        );
-
-        if (!petResult.rows[0]) {
-          throw new NotFoundException(`Pet ${id} no encontrado`);
-        }
-
-        const petTypeId = data.pet_typeId ?? petResult.rows[0].pet_type_id;
-        const newBreed = await pool.query<{ breed_id: number }>(
-          `
-            INSERT INTO breeds (pet_type_id, breed_name)
-            VALUES ($1, $2)
-            RETURNING breed_id
-          `,
-          [petTypeId, breedName],
-        );
-
-        resolvedBreedId = newBreed.rows[0].breed_id;
+        values.push(updateValue);
       }
+
+      fields.push(`${fieldMap[key]} = $${values.length}`);
     }
+  }
 
-    const updateData =
-      data.breed_name !== undefined || data.owner_name !== undefined
-        ? { ...data, breed_id: resolvedBreedId, owner_id: resolvedOwnerId }
-        : data;
+  if (fields.length === 0) {
+    throw new BadRequestException('No fields to update');
+  }
 
-    // ✅ Construcción dinámica de update
+  values.push(id);
 
-    for (const key of Object.keys(updateData) as Array<keyof UpdatePetDto>) {
-      const value = updateData[key];
-
-      if (key === 'breed_name') {
-        continue;
-      }
-
-      if (key === 'owner_name') {
-        continue;
-      }
-
-      if (value !== undefined && fieldMap[key]) {
-        const updateValue =
-          key === 'breed_id'
-            ? resolvedBreedId
-            : key === 'owner_id'
-              ? resolvedOwnerId
-              : value;
-
-        if (updateValue === undefined) {
-          continue;
-        }
-
-        if (key === 'weight') {
-          const numericValue = Number(updateValue);
-
-          if (isNaN(numericValue) || numericValue <= 0) {
-            throw new BadRequestException('Weight must be a positive number');
-          }
-          console.log(key, value, typeof value);
-
-          values.push(numericValue);
-        } else {
-          values.push(updateValue);
-        }
-
-        fields.push(`${fieldMap[key]} = $${values.length}`);
-      }
-    }
-
-    // ✅ Validación
-    if (fields.length === 0) {
-      throw new Error('No fields to update');
-    }
-
-    // ✅ ID al final
-    values.push(id);
-
-    const query = `
+  const query = `
     UPDATE pets
     SET ${fields.join(', ')}
     WHERE pet_id = $${values.length}
     RETURNING *;
   `;
 
-    let rows: Pet[];
-    try {
-      ({ rows } = await pool.query<Pet>(query, values));
-    } catch (error) {
-      this.rethrowMicrochipUniqueViolation(error);
-    }
+  let rows: Pet[];
 
-    if (rows.length === 0) {
-      throw new NotFoundException(`Pet ${id} no encontrado`);
-    }
-
-    return this.toApiPet(rows[0]);
+  try {
+    ({ rows } = await pool.query<Pet>(query, values));
+  } catch (error) {
+    this.rethrowMicrochipUniqueViolation(error);
   }
 
-  private toApiPet(pet: Pet): Pet {
-    return {
-      ...pet,
-      ownerId: pet.owner_id,
-    };
+  if (rows.length === 0) {
+    throw new NotFoundException(`Pet ${id} no encontrado`);
   }
 
-  private rethrowPetArchiveError(error: unknown): never {
-    const archiveError = getPetArchiveError(error);
-    if (archiveError) {
-      throw new ConflictException(archiveError);
-    }
-    throw error;
-  }
+  return this.toApiPet(rows[0]);
+}
 
   // ✅ DELETE
   async removePet(id: number): Promise<{ message: string }> {
@@ -569,100 +583,129 @@ export class PetsService {
     return { message: 'Mascota archivada y eliminada.' };
   }
 
-  async removeManyPets(petIds: number[]): Promise<{ deletedPetIds: number[] }> {
-    const client = await pool.connect();
+  // ✅ DELETE MANY
+  async removeManyPets(
+    petIds: number[],
+  ): Promise<{ deletedPetIds: number[] }> {
+  const client = await pool.connect();
 
-    try {
-      await client.query('BEGIN');
+  try {
+    await client.query('BEGIN');
 
-      const existingPets = await client.query<{ pet_id: number }>(
-        'SELECT pet_id FROM pets WHERE pet_id = ANY($1::int[]) FOR UPDATE',
-        [petIds],
+    const existingPets = await client.query<{ pet_id: number }>(
+      `
+      SELECT pet_id
+      FROM pets
+      WHERE pet_id = ANY($1::int[])
+      FOR UPDATE
+      `,
+      [petIds],
+    );
+
+    const existingPetIds = new Set(
+      existingPets.rows.map((pet) => Number(pet.pet_id)),
+    );
+
+    const missingPetIds = petIds.filter(
+      (petId) => !existingPetIds.has(petId),
+    );
+
+    if (missingPetIds.length > 0) {
+      throw new NotFoundException(
+        `No se encontraron las mascotas seleccionadas con ID: ${missingPetIds.join(', ')}. Actualiza la lista e inténtalo de nuevo.`,
       );
-
-      const existingPetIds = new Set(
-        existingPets.rows.map((pet) => Number(pet.pet_id)),
-      );
-      const missingPetIds = petIds.filter((petId) => !existingPetIds.has(petId));
-      if (missingPetIds.length > 0) {
-        throw new NotFoundException(
-          `No se encontraron las mascotas seleccionadas con ID: ${missingPetIds.join(', ')}. Actualiza la lista e inténtalo de nuevo.`,
-        );
-      }
-
-      const archivedPets = await client.query<{ pet_id: number }>(
-        `INSERT INTO archivo_pets
-         OVERRIDING SYSTEM VALUE
-         SELECT pets.*
-         FROM pets
-         WHERE pet_id = ANY($1::int[])
-         RETURNING pet_id`,
-        [petIds],
-      );
-
-      const archivedPetIds = new Set(
-        archivedPets.rows.map((pet) => Number(pet.pet_id)),
-      );
-      const petsMissingFromArchive = petIds.filter(
-        (petId) => !archivedPetIds.has(petId),
-      );
-      if (petsMissingFromArchive.length > 0) {
-        throw new ConflictException(
-          `No se archivaron todas las mascotas seleccionadas. IDs no copiados: ${petsMissingFromArchive.join(', ')}.`,
-        );
-      }
-
-      const deletedPets = await client.query<{ pet_id: number }>(
-        'DELETE FROM pets WHERE pet_id = ANY($1::int[]) RETURNING pet_id',
-        [petIds],
-      );
-      const deletedPetIds = new Set(
-        deletedPets.rows.map((pet) => Number(pet.pet_id)),
-      );
-      const petsNotDeleted = petIds.filter(
-        (petId) => !deletedPetIds.has(petId),
-      );
-      if (petsNotDeleted.length > 0) {
-        throw new ConflictException(
-          `No se eliminaron las mascotas con ID: ${petsNotDeleted.join(', ')}. La operación se canceló y no se archivó ningún registro.`,
-        );
-      }
-
-      await client.query('COMMIT');
-      return { deletedPetIds: deletedPets.rows.map((pet) => Number(pet.pet_id)) };
-    } catch (error) {
-      await client.query('ROLLBACK');
-
-      const archiveError = getPetArchiveError(error);
-      if (archiveError) {
-        throw new ConflictException(archiveError);
-      }
-
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === '23505'
-      ) {
-        throw new ConflictException(
-          'El archivo ya contiene una mascota con el mismo identificador; no se eliminó ningún dato.',
-        );
-      }
-
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === '23503'
-      ) {
-        throw new ConflictException(
-          'No se pudo archivar la mascota porque otros registros dependen de ella.',
-        );
-      }
-
-      throw error;
-    } finally {
-      client.release();
     }
+
+    const archivedPets = await client.query<{ pet_id: number }>(
+      `
+      INSERT INTO archivo_pets
+      OVERRIDING SYSTEM VALUE
+      SELECT pets.*
+      FROM pets
+      WHERE pet_id = ANY($1::int[])
+      RETURNING pet_id
+      `,
+      [petIds],
+    );
+
+    const archivedPetIds = new Set(
+      archivedPets.rows.map((pet) => Number(pet.pet_id)),
+    );
+
+    const petsMissingFromArchive = petIds.filter(
+      (petId) => !archivedPetIds.has(petId),
+    );
+
+    if (petsMissingFromArchive.length > 0) {
+      throw new ConflictException(
+        `No se archivaron todas las mascotas seleccionadas. IDs no copiados: ${petsMissingFromArchive.join(', ')}.`,
+      );
+    }
+
+    const deletedPets = await client.query<{ pet_id: number }>(
+      `
+      DELETE FROM pets
+      WHERE pet_id = ANY($1::int[])
+      RETURNING pet_id
+      `,
+      [petIds],
+    );
+
+    const deletedPetIds = new Set(
+      deletedPets.rows.map((pet) => Number(pet.pet_id)),
+    );
+
+    const petsNotDeleted = petIds.filter(
+      (petId) => !deletedPetIds.has(petId),
+    );
+
+    if (petsNotDeleted.length > 0) {
+      throw new ConflictException(
+        `No se eliminaron las mascotas con ID: ${petsNotDeleted.join(', ')}. La operación se canceló y no se archivó ningún registro.`,
+      );
+    }
+
+    await client.query('COMMIT');
+
+    return {
+      deletedPetIds: deletedPets.rows.map((pet) =>
+        Number(pet.pet_id),
+      ),
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+
+    const archiveError = getPetArchiveError(error);
+
+    if (archiveError) {
+      throw new ConflictException(archiveError);
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23505'
+    ) {
+      throw new ConflictException(
+        'El archivo ya contiene una mascota con el mismo identificador; no se eliminó ningún dato.',
+      );
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23503'
+    ) {
+      throw new ConflictException(
+        'No se pudo archivar la mascota porque otros registros dependen de ella.',
+      );
+    }
+
+    throw error;
+  } finally {
+    client.release();
   }
+}
 }

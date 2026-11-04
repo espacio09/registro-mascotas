@@ -34,11 +34,6 @@ describe('PetsService', () => {
   });
 
   it('maps owner_id from the DB to ownerId in the API contract', async () => {
-    // ...
-  });
-});
-
-  it('maps owner_id from the DB to ownerId in the API contract', async () => {
     mockQuery.mockResolvedValue({
       rows: [
         {
@@ -160,6 +155,20 @@ describe('PetsService', () => {
     );
   });
 
+  it('updates owner_id and breed_id when provided directly', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ pet_id: 10, owner_id: 7, breed_id: 9 }],
+    });
+
+    const service = new PetsService();
+    await service.updatePet(10, { owner_id: 7, breed_id: 9 });
+
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('owner_id = $1, breed_id = $2'),
+      [7, 9, 10],
+    );
+  });
+
   it('archives a pet before removing it from the active pets table', async () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })
@@ -172,14 +181,18 @@ describe('PetsService', () => {
     const result = await service.removePet(10);
 
     expect(result).toEqual({ message: 'Mascota archivada y eliminada.' });
-    expect(mockClientQuery.mock.calls.map(([query]) => query.trim())).toEqual([
+    expect(
+      mockClientQuery.mock.calls.map(([query]) =>
+        query.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual([
       'BEGIN',
       'SELECT pet_id FROM pets WHERE pet_id = ANY($1::int[]) FOR UPDATE',
       expect.stringContaining('INSERT INTO archivo_pets'),
       'DELETE FROM pets WHERE pet_id = ANY($1::int[]) RETURNING pet_id',
       'COMMIT',
     ]);
-    expect(mockClientQuery).toHaveBeenNthCalledWith(3, expect.any(String), [10]);
+    expect(mockClientQuery).toHaveBeenNthCalledWith(3, expect.any(String), [[10]]);
     expect(mockRelease).toHaveBeenCalledTimes(1);
   });
 
@@ -195,18 +208,26 @@ describe('PetsService', () => {
     const result = await service.removeManyPets([10, 11]);
 
     expect(result).toEqual({ deletedPetIds: [10, 11] });
-    expect(mockClientQuery.mock.calls.map(([query]) => query.trim())).toEqual([
+    expect(
+      mockClientQuery.mock.calls.map(([query]) =>
+        query.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual([
       'BEGIN',
       'SELECT pet_id FROM pets WHERE pet_id = ANY($1::int[]) FOR UPDATE',
       expect.stringContaining('INSERT INTO archivo_pets'),
       'DELETE FROM pets WHERE pet_id = ANY($1::int[]) RETURNING pet_id',
       'COMMIT',
     ]);
-    expect(mockClientQuery).toHaveBeenNthCalledWith(3, expect.any(String), [10, 11]);
+    expect(mockClientQuery).toHaveBeenNthCalledWith(
+      3,
+      expect.any(String),
+      [[10, 11]],
+    );
     expect(mockClientQuery).toHaveBeenNthCalledWith(
       4,
       expect.any(String),
-      [10, 11],
+      [[10, 11]],
     );
     expect(mockRelease).toHaveBeenCalledTimes(1);
   });
@@ -222,7 +243,11 @@ describe('PetsService', () => {
     await expect(service.removeManyPets([10, 11])).rejects.toThrow(
       'No se encontraron las mascotas seleccionadas con ID: 11.',
     );
-    expect(mockClientQuery.mock.calls.map(([query]) => query.trim())).toEqual([
+    expect(
+      mockClientQuery.mock.calls.map(([query]) =>
+        query.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual([
       'BEGIN',
       'SELECT pet_id FROM pets WHERE pet_id = ANY($1::int[]) FOR UPDATE',
       'ROLLBACK',

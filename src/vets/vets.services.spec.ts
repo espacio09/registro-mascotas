@@ -18,6 +18,10 @@ describe('VetsServices', () => {
     where: jest.fn(),
     andWhere: jest.fn(),
     getOne: jest.fn(),
+    select: jest.fn(),
+    addSelect: jest.fn(),
+    orderBy: jest.fn(),
+    getRawMany: jest.fn(),
   };
   let service: VetsServices;
 
@@ -25,6 +29,9 @@ describe('VetsServices', () => {
     jest.clearAllMocks();
     queryBuilder.where.mockReturnValue(queryBuilder);
     queryBuilder.andWhere.mockReturnValue(queryBuilder);
+    queryBuilder.select.mockReturnValue(queryBuilder);
+    queryBuilder.addSelect.mockReturnValue(queryBuilder);
+    queryBuilder.orderBy.mockReturnValue(queryBuilder);
     queryBuilder.getOne.mockResolvedValue(null);
     vetsRepository.createQueryBuilder.mockReturnValue(queryBuilder);
     service = new VetsServices(
@@ -37,12 +44,21 @@ describe('VetsServices', () => {
       { id: 1, firstName: 'Ana' },
       { id: 4, firstName: 'Luca' },
     ];
-    vetsRepository.find.mockResolvedValue(vets);
+    queryBuilder.getRawMany.mockResolvedValue(vets);
 
     await expect(service.findAll()).resolves.toBe(vets);
-    expect(vetsRepository.find).toHaveBeenCalledWith({
-      order: { id: 'ASC' },
-    });
+    expect(vetsRepository.createQueryBuilder).toHaveBeenCalledWith('vet');
+    expect(queryBuilder.select).toHaveBeenCalledWith('vet.id', 'id');
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+      "to_jsonb(vet)->>'street'",
+      'street',
+    );
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+      "to_jsonb(vet)->>'specialization'",
+      'specialty',
+    );
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith('vet.id', 'ASC');
+    expect(queryBuilder.getRawMany).toHaveBeenCalled();
   });
 
   it('maps API properties to database entity properties when creating a vet', async () => {

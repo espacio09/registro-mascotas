@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -38,7 +39,18 @@ export class VetsServices {
   ) {}
 
   findAll(): Promise<VetEntity[]> {
-    return this.vetsRepository.find({ order: { id: 'ASC' } });
+    return this.vetsRepository
+      .createQueryBuilder('vet')
+      .select('vet.id', 'id')
+      .addSelect('vet.firstName', 'firstName')
+      .addSelect('vet.lastName', 'lastName')
+      .addSelect('vet.address', 'address')
+      .addSelect('vet.email', 'email')
+      .addSelect('vet.phone', 'phone')
+      .addSelect("to_jsonb(vet)->>'street'", 'street')
+      .addSelect("to_jsonb(vet)->>'specialization'", 'specialty')
+      .orderBy('vet.id', 'ASC')
+      .getRawMany<VetEntity>();
   }
 
   async findOne(id: number): Promise<VetEntity> {
@@ -48,6 +60,16 @@ export class VetsServices {
     }
 
     return vet;
+  }
+
+  // ✅ Método privado
+  private rethrowVetArchiveError(error: unknown): never {
+    console.error(error);
+
+    throw new InternalServerErrorException(
+      'No se pudo obtener el veterinario.',
+      'Error al obtener el veterinario',
+    );
   }
 
   async create(createVetDto: CreateVetDto): Promise<VetEntity> {
