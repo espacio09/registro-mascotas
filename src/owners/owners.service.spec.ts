@@ -21,20 +21,6 @@ vi.mock('pg', () => ({
 
 describe('OwnersService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-
-    mockConnect.mockResolvedValue({
-      query: mockClientQuery,
-      release: mockRelease,
-     });
-
-    mockRelease.mockImplementation(() => {});
-  });
-
-
-
-describe('OwnersService', () => {
-  beforeEach(() => {
     mockQuery.mockReset();
     mockClientQuery.mockReset();
     mockRelease.mockReset();
@@ -150,6 +136,7 @@ describe('OwnersService', () => {
         first_name: 'Ana',
         last_name: 'García',
         address: 'Calle 1',
+        email: 'ana@example.com',
         phone: '123456789',
       }),
     ).rejects.toMatchObject({
@@ -169,6 +156,7 @@ describe('OwnersService', () => {
 
   it('creates an owner after duplicate-name confirmation', async () => {
     mockQuery
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ owner_id: 8 }] })
       .mockResolvedValueOnce({ rows: [{ owner_id: 8, pets: [] }] });
 
@@ -177,6 +165,7 @@ describe('OwnersService', () => {
       first_name: 'Ana',
       last_name: 'García',
       address: 'Calle 1',
+      email: 'ana@example.com',
       phone: '123456789',
       confirm_duplicate_name: true,
     });

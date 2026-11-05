@@ -1,32 +1,33 @@
 import { NotFoundException } from '@nestjs/common';
 import { validate } from 'class-validator';
 import type { Repository } from 'typeorm';
+import { vi } from 'vitest';
 import { VetEntity } from './entities/vet.entity';
 import { UpdateVetDto } from './dto/update-vet.dto';
 import { VetsServices } from './vets.services';
 
 describe('VetsServices', () => {
   const vetsRepository = {
-    find: jest.fn(),
-    findOneBy: jest.fn(),
-    createQueryBuilder: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-    remove: jest.fn(),
+    find: vi.fn(),
+    findOneBy: vi.fn(),
+    createQueryBuilder: vi.fn(),
+    create: vi.fn(),
+    save: vi.fn(),
+    remove: vi.fn(),
   };
   const queryBuilder = {
-    where: jest.fn(),
-    andWhere: jest.fn(),
-    getOne: jest.fn(),
-    select: jest.fn(),
-    addSelect: jest.fn(),
-    orderBy: jest.fn(),
-    getRawMany: jest.fn(),
+    where: vi.fn(),
+    andWhere: vi.fn(),
+    getOne: vi.fn(),
+    select: vi.fn(),
+    addSelect: vi.fn(),
+    orderBy: vi.fn(),
+    getRawMany: vi.fn(),
   };
   let service: VetsServices;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     queryBuilder.where.mockReturnValue(queryBuilder);
     queryBuilder.andWhere.mockReturnValue(queryBuilder);
     queryBuilder.select.mockReturnValue(queryBuilder);
