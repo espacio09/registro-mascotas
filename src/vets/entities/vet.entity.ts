@@ -22,7 +22,4 @@ export class VetEntity {
 
   @Column({ type: 'varchar' })
   email!: string;
-
-  @Column({ name: 'specialization', nullable: true })
-  specialty?: string;
 }

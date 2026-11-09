@@ -16,7 +16,11 @@ const DUPLICATE_VET_PHONE_MESSAGE =
   'Ya existe un veterinario registrado con este teléfono.';
 
 function isDuplicateVetFieldError(error: unknown, constraint: string): boolean {
-  if (typeof error !== 'object' || error === null || !('driverError' in error)) {
+  if (
+    typeof error !== 'object' ||
+    error === null ||
+    !('driverError' in error)
+  ) {
     return false;
   }
 
@@ -44,11 +48,10 @@ export class VetsServices {
       .select('vet.id', 'id')
       .addSelect('vet.firstName', 'firstName')
       .addSelect('vet.lastName', 'lastName')
+      .addSelect('vet.street', 'street')
       .addSelect('vet.address', 'address')
       .addSelect('vet.email', 'email')
       .addSelect('vet.phone', 'phone')
-      .addSelect("to_jsonb(vet)->>'street'", 'street')
-      .addSelect("to_jsonb(vet)->>'specialization'", 'specialty')
       .orderBy('vet.id', 'ASC')
       .getRawMany<VetEntity>();
   }
@@ -74,7 +77,7 @@ export class VetsServices {
 
   async create(createVetDto: CreateVetDto): Promise<VetEntity> {
     const email = createVetDto.email.trim();
-    const phone = createVetDto.phoneNumber.trim();
+    const phone = createVetDto.phone.trim();
     await this.ensureContactDetailsAreUnique(email, phone);
 
     const vet = this.vetsRepository.create({
@@ -102,7 +105,7 @@ export class VetsServices {
   async update(id: number, updateVetDto: UpdateVetDto): Promise<VetEntity> {
     const vet = await this.findOne(id);
     const email = updateVetDto.email?.trim();
-    const phone = updateVetDto.phoneNumber?.trim();
+    const phone = updateVetDto.phone?.trim();
     await this.ensureContactDetailsAreUnique(email, phone, id);
 
     if (updateVetDto.firstName !== undefined) {
@@ -120,8 +123,8 @@ export class VetsServices {
     if (updateVetDto.email !== undefined) {
       vet.email = updateVetDto.email.trim();
     }
-    if (updateVetDto.phoneNumber !== undefined) {
-      vet.phone = updateVetDto.phoneNumber.trim();
+    if (updateVetDto.phone !== undefined) {
+      vet.phone = updateVetDto.phone.trim();
     }
 
     try {

@@ -1,9 +1,4 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsEmail,
-  IsOptional,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, IsOptional } from 'class-validator';
 
 export class CreateVetDto {
   @IsString()
@@ -29,5 +24,5 @@ export class CreateVetDto {
 
   @IsString()
   @IsNotEmpty()
-  phoneNumber!: string;
+  phone!: string;
 }

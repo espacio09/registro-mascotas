@@ -23,5 +23,5 @@ export class UpdateVetDto {
 
   @IsOptional()
   @IsString()
-  phoneNumber?: string;
+  phone?: string;
 }

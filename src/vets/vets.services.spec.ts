@@ -50,19 +50,16 @@ describe('VetsServices', () => {
     await expect(service.findAll()).resolves.toBe(vets);
     expect(vetsRepository.createQueryBuilder).toHaveBeenCalledWith('vet');
     expect(queryBuilder.select).toHaveBeenCalledWith('vet.id', 'id');
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.street', 'street');
     expect(queryBuilder.addSelect).toHaveBeenCalledWith(
-      "to_jsonb(vet)->>'street'",
-      'street',
-    );
-    expect(queryBuilder.addSelect).toHaveBeenCalledWith(
-      "to_jsonb(vet)->>'specialization'",
-      'specialty',
+      'vet.address',
+      'address',
     );
     expect(queryBuilder.orderBy).toHaveBeenCalledWith('vet.id', 'ASC');
     expect(queryBuilder.getRawMany).toHaveBeenCalled();
   });
 
-  it('maps API properties to database entity properties when creating a vet', async () => {
+  it('stores the API phone field in the database phone property when creating a vet', async () => {
     const vet = { id: 4, firstName: 'Luca', phone: '12345' };
     vetsRepository.create.mockReturnValue(vet);
     vetsRepository.save.mockResolvedValue(vet);
@@ -74,7 +71,7 @@ describe('VetsServices', () => {
         street: 'Main Street 1',
         address: 'Frankfurt',
         email: 'luca@example.com',
-        phoneNumber: '12345',
+        phone: '12345',
       }),
     ).resolves.toBe(vet);
     expect(vetsRepository.create).toHaveBeenCalledWith({
@@ -97,7 +94,7 @@ describe('VetsServices', () => {
         firstName: 'Ada',
         lastName: 'Lovelace',
         email: 'ada@example.com',
-        phoneNumber: '12345',
+        phone: '12345',
       }),
     ).resolves.toBe(vet);
     expect(vetsRepository.create).toHaveBeenCalledWith({
@@ -120,7 +117,7 @@ describe('VetsServices', () => {
         street: 'Main Street 1',
         address: 'Frankfurt',
         email: 'LUCA@example.com',
-        phoneNumber: '12345',
+        phone: '12345',
       }),
     ).rejects.toThrow('Ya existe un veterinario registrado con este correo electrónico.');
     expect(vetsRepository.save).not.toHaveBeenCalled();
@@ -133,7 +130,7 @@ describe('VetsServices', () => {
         street: 'Main Street 1',
         address: 'Frankfurt',
         email: 'luca@example.com',
-        phoneNumber: '12345',
+        phone: '12345',
       }),
     ).rejects.toThrow('Ya existe un veterinario registrado con este teléfono.');
     expect(vetsRepository.save).not.toHaveBeenCalled();
@@ -154,12 +151,12 @@ describe('VetsServices', () => {
     vetsRepository.remove.mockResolvedValue(vet);
 
     await service.update(4, {
-      phoneNumber: '67890',
-      street: '',
+      phone: '67890',
+      street: 'New Street 9',
       address: 'Berlin',
     });
     expect(vet.phone).toBe('67890');
-    expect(vet.street).toBeNull();
+    expect(vet.street).toBe('New Street 9');
     expect(vet.address).toBe('Berlin');
     expect(vetsRepository.save).toHaveBeenCalledWith(vet);
 
@@ -179,6 +176,7 @@ describe('VetsServices', () => {
     const dto = Object.assign(new UpdateVetDto(), {
       street: 'Main Street 1',
       address: 'Frankfurt',
+      phone: '12345',
     });
 
     await expect(

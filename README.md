@@ -33,6 +33,10 @@ $ npm install
 
 ## Database setup
 
+Before creating or updating veterinarians, apply
+`sql/20261103_vet_street_optional_address.sql` to the PostgreSQL database used by
+the backend. It adds the optional `street` column and makes `address` optional.
+
 Before using owner deletion, apply
 `sql/20261006_archive_owners_and_pets.sql` to the PostgreSQL database used by the
 backend. It creates the `archivoOwners` and `archivoPets` archive tables and
