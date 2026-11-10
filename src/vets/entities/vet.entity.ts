@@ -14,10 +14,16 @@ export class VetEntity {
   @Column({ type: 'varchar', nullable: true })
   street?: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
-  address?: string | null;
+  @Column({ name: 'house_number', type: 'varchar', nullable: true })
+  houseNumber?: string | null;
 
-  @Column({ name: 'phone', type: 'varchar' })
+  @Column({ name: 'postal_code', type: 'varchar', nullable: true })
+  postalCode?: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  city?: string | null;
+
+  @Column({ name: 'phone_number', type: 'varchar' })
   phone!: string;
 
   @Column({ type: 'varchar' })

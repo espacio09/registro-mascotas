@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { validate } from 'class-validator';
-import type { Repository } from 'typeorm';
+import { getMetadataArgsStorage, type Repository } from 'typeorm';
 import { vi } from 'vitest';
 import { VetEntity } from './entities/vet.entity';
 import { UpdateVetDto } from './dto/update-vet.dto';
@@ -40,6 +40,15 @@ describe('VetsServices', () => {
     );
   });
 
+  it('maps the API phone property to the phone_number database column', () => {
+    const phoneColumn = getMetadataArgsStorage().columns.find(
+      (column) =>
+        column.target === VetEntity && column.propertyName === 'phone',
+    );
+
+    expect(phoneColumn?.options.name).toBe('phone_number');
+  });
+
   it('returns all veterinarians from the database in ID order', async () => {
     const vets = [
       { id: 1, firstName: 'Ana' },
@@ -52,9 +61,16 @@ describe('VetsServices', () => {
     expect(queryBuilder.select).toHaveBeenCalledWith('vet.id', 'id');
     expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.street', 'street');
     expect(queryBuilder.addSelect).toHaveBeenCalledWith(
-      'vet.address',
-      'address',
+      'vet.houseNumber',
+      'houseNumber',
     );
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+      'vet.postalCode',
+      'postalCode',
+    );
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.city', 'city');
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.phone', 'phone');
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.email', 'email');
     expect(queryBuilder.orderBy).toHaveBeenCalledWith('vet.id', 'ASC');
     expect(queryBuilder.getRawMany).toHaveBeenCalled();
   });
@@ -68,8 +84,10 @@ describe('VetsServices', () => {
       service.create({
         firstName: 'Luca',
         lastName: 'Auer',
-        street: 'Main Street 1',
-        address: 'Frankfurt',
+        street: 'Main Street',
+        houseNumber: '1',
+        postalCode: '60311',
+        city: 'Frankfurt',
         email: 'luca@example.com',
         phone: '12345',
       }),
@@ -77,14 +95,16 @@ describe('VetsServices', () => {
     expect(vetsRepository.create).toHaveBeenCalledWith({
       firstName: 'Luca',
       lastName: 'Auer',
-      street: 'Main Street 1',
-      address: 'Frankfurt',
+      street: 'Main Street',
+      houseNumber: '1',
+      postalCode: '60311',
+      city: 'Frankfurt',
       email: 'luca@example.com',
       phone: '12345',
     });
   });
 
-  it('creates a vet without optional street or address', async () => {
+  it('creates a vet without optional address fields', async () => {
     const vet = { id: 5, firstName: 'Ada', email: 'ada@example.com' };
     vetsRepository.create.mockReturnValue(vet);
     vetsRepository.save.mockResolvedValue(vet);
@@ -101,7 +121,9 @@ describe('VetsServices', () => {
       firstName: 'Ada',
       lastName: 'Lovelace',
       street: null,
-      address: null,
+      houseNumber: null,
+      postalCode: null,
+      city: null,
       email: 'ada@example.com',
       phone: '12345',
     });
@@ -114,8 +136,10 @@ describe('VetsServices', () => {
       service.create({
         firstName: 'Luca',
         lastName: 'Auer',
-        street: 'Main Street 1',
-        address: 'Frankfurt',
+        street: 'Main Street',
+        houseNumber: '1',
+        postalCode: '60311',
+        city: 'Frankfurt',
         email: 'LUCA@example.com',
         phone: '12345',
       }),
@@ -127,8 +151,10 @@ describe('VetsServices', () => {
       service.create({
         firstName: 'Luca',
         lastName: 'Auer',
-        street: 'Main Street 1',
-        address: 'Frankfurt',
+        street: 'Main Street',
+        houseNumber: '1',
+        postalCode: '60311',
+        city: 'Frankfurt',
         email: 'luca@example.com',
         phone: '12345',
       }),
@@ -141,8 +167,10 @@ describe('VetsServices', () => {
       id: 4,
       firstName: 'Luca',
       lastName: 'Auer',
-      street: 'Main Street 1',
-      address: 'Frankfurt',
+      street: 'Main Street',
+      houseNumber: '1',
+      postalCode: '60311',
+      city: 'Frankfurt',
       email: 'luca@example.com',
       phone: '12345',
     };
@@ -152,12 +180,16 @@ describe('VetsServices', () => {
 
     await service.update(4, {
       phone: '67890',
-      street: 'New Street 9',
-      address: 'Berlin',
+      street: 'New Street',
+      houseNumber: '9',
+      postalCode: '10115',
+      city: 'Berlin',
     });
     expect(vet.phone).toBe('67890');
-    expect(vet.street).toBe('New Street 9');
-    expect(vet.address).toBe('Berlin');
+    expect(vet.street).toBe('New Street');
+    expect(vet.houseNumber).toBe('9');
+    expect(vet.postalCode).toBe('10115');
+    expect(vet.city).toBe('Berlin');
     expect(vetsRepository.save).toHaveBeenCalledWith(vet);
 
     await expect(service.remove(4)).resolves.toBe(vet);
@@ -172,10 +204,12 @@ describe('VetsServices', () => {
     );
   });
 
-  it('accepts street and address in a partial update DTO', async () => {
+  it('accepts the new address fields in a partial update DTO', async () => {
     const dto = Object.assign(new UpdateVetDto(), {
-      street: 'Main Street 1',
-      address: 'Frankfurt',
+      street: 'Main Street',
+      houseNumber: '1',
+      postalCode: '60311',
+      city: 'Frankfurt',
       phone: '12345',
     });
 

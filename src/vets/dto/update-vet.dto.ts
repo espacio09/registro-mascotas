@@ -15,7 +15,15 @@ export class UpdateVetDto {
 
   @IsOptional()
   @IsString()
-  address?: string;
+  houseNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
 
   @IsOptional()
   @IsEmail()

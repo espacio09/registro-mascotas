@@ -49,9 +49,11 @@ export class VetsServices {
       .addSelect('vet.firstName', 'firstName')
       .addSelect('vet.lastName', 'lastName')
       .addSelect('vet.street', 'street')
-      .addSelect('vet.address', 'address')
-      .addSelect('vet.email', 'email')
+      .addSelect('vet.houseNumber', 'houseNumber')
+      .addSelect('vet.postalCode', 'postalCode')
+      .addSelect('vet.city', 'city')
       .addSelect('vet.phone', 'phone')
+      .addSelect('vet.email', 'email')
       .orderBy('vet.id', 'ASC')
       .getRawMany<VetEntity>();
   }
@@ -84,7 +86,9 @@ export class VetsServices {
       firstName: createVetDto.firstName,
       lastName: createVetDto.lastName,
       street: createVetDto.street?.trim() || null,
-      address: createVetDto.address?.trim() || null,
+      houseNumber: createVetDto.houseNumber?.trim() || null,
+      postalCode: createVetDto.postalCode?.trim() || null,
+      city: createVetDto.city?.trim() || null,
       email,
       phone,
     });
@@ -117,8 +121,14 @@ export class VetsServices {
     if (updateVetDto.street !== undefined) {
       vet.street = updateVetDto.street.trim() || null;
     }
-    if (updateVetDto.address !== undefined) {
-      vet.address = updateVetDto.address.trim() || null;
+    if (updateVetDto.houseNumber !== undefined) {
+      vet.houseNumber = updateVetDto.houseNumber.trim() || null;
+    }
+    if (updateVetDto.postalCode !== undefined) {
+      vet.postalCode = updateVetDto.postalCode.trim() || null;
+    }
+    if (updateVetDto.city !== undefined) {
+      vet.city = updateVetDto.city.trim() || null;
     }
     if (updateVetDto.email !== undefined) {
       vet.email = updateVetDto.email.trim();

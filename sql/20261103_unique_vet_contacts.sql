@@ -12,11 +12,11 @@ BEGIN
   END IF;
 
   IF EXISTS (
-    SELECT btrim(phone)
+    SELECT btrim(phone_number)
     FROM veterinarians
-    WHERE phone IS NOT NULL
-      AND btrim(phone) <> ''
-    GROUP BY btrim(phone)
+    WHERE phone_number IS NOT NULL
+      AND btrim(phone_number) <> ''
+    GROUP BY btrim(phone_number)
     HAVING COUNT(*) > 1
   ) THEN
     RAISE EXCEPTION 'Duplicate veterinarian phone numbers exist; resolve them before applying this migration.';
@@ -29,6 +29,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS veterinarians_email_unique
     AND btrim(email) <> '';
 
 CREATE UNIQUE INDEX IF NOT EXISTS veterinarians_phone_unique
-  ON veterinarians (btrim(phone))
-  WHERE phone IS NOT NULL
-    AND btrim(phone) <> '';
+  ON veterinarians (btrim(phone_number))
+  WHERE phone_number IS NOT NULL
+    AND btrim(phone_number) <> '';
