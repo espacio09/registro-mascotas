@@ -3,6 +3,7 @@ import { validate } from 'class-validator';
 import { getMetadataArgsStorage, type Repository } from 'typeorm';
 import { vi } from 'vitest';
 import { VetEntity } from './entities/vet.entity';
+import { CreateVetDto } from './dto/create-vet.dto';
 import { UpdateVetDto } from './dto/update-vet.dto';
 import { VetsServices } from './vets.services';
 
@@ -69,8 +70,21 @@ describe('VetsServices', () => {
       'postalCode',
     );
     expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.city', 'city');
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+      'vet.country',
+      'country',
+    );
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+      'vet.phoneCountryCode',
+      'phoneCountryCode',
+    );
     expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.phone', 'phone');
     expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.email', 'email');
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+      'vet.specialization',
+      'specialization',
+    );
+    expect(queryBuilder.addSelect).toHaveBeenCalledWith('vet.notes', 'notes');
     expect(queryBuilder.orderBy).toHaveBeenCalledWith('vet.id', 'ASC');
     expect(queryBuilder.getRawMany).toHaveBeenCalled();
   });
@@ -99,6 +113,10 @@ describe('VetsServices', () => {
       houseNumber: '1',
       postalCode: '60311',
       city: 'Frankfurt',
+      country: null,
+      phoneCountryCode: null,
+      specialization: null,
+      notes: null,
       email: 'luca@example.com',
       phone: '12345',
     });
@@ -124,6 +142,10 @@ describe('VetsServices', () => {
       houseNumber: null,
       postalCode: null,
       city: null,
+      country: null,
+      phoneCountryCode: null,
+      specialization: null,
+      notes: null,
       email: 'ada@example.com',
       phone: '12345',
     });
@@ -184,12 +206,20 @@ describe('VetsServices', () => {
       houseNumber: '9',
       postalCode: '10115',
       city: 'Berlin',
+      country: 'Germany',
+      phoneCountryCode: '+49',
+      specialization: 'Cardiology',
+      notes: 'Available on weekends',
     });
     expect(vet.phone).toBe('67890');
     expect(vet.street).toBe('New Street');
     expect(vet.houseNumber).toBe('9');
     expect(vet.postalCode).toBe('10115');
     expect(vet.city).toBe('Berlin');
+    expect(vet.country).toBe('Germany');
+    expect(vet.phoneCountryCode).toBe('+49');
+    expect(vet.specialization).toBe('Cardiology');
+    expect(vet.notes).toBe('Available on weekends');
     expect(vetsRepository.save).toHaveBeenCalledWith(vet);
 
     await expect(service.remove(4)).resolves.toBe(vet);
@@ -204,15 +234,46 @@ describe('VetsServices', () => {
     );
   });
 
-  it('accepts the new address fields in a partial update DTO', async () => {
+  it('accepts optional profile fields in a partial update DTO', async () => {
     const dto = Object.assign(new UpdateVetDto(), {
       street: 'Main Street',
       houseNumber: '1',
       postalCode: '60311',
       city: 'Frankfurt',
+      country: 'Germany',
+      phoneCountryCode: '',
+      specialization: '',
+      notes: '',
       phone: '12345',
     });
 
+    await expect(
+      validate(dto, { whitelist: true, forbidNonWhitelisted: true }),
+    ).resolves.toHaveLength(0);
+  });
+
+  it('requires a country when creating a vet', async () => {
+    const dto = Object.assign(new CreateVetDto(), {
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email: 'ada@example.com',
+      phone: '12345',
+    });
+
+    await expect(
+      validate(dto, { whitelist: true, forbidNonWhitelisted: true }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ property: 'country' }),
+      ]),
+    );
+
+    Object.assign(dto, {
+      country: 'Germany',
+      phoneCountryCode: '+49',
+      specialization: 'Cardiology',
+      notes: 'Available on weekends',
+    });
     await expect(
       validate(dto, { whitelist: true, forbidNonWhitelisted: true }),
     ).resolves.toHaveLength(0);

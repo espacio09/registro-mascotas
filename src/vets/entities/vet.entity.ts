@@ -23,9 +23,21 @@ export class VetEntity {
   @Column({ type: 'varchar', nullable: true })
   city?: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  country?: string | null;
+
+  @Column({ name: 'phone_country_code', type: 'varchar', nullable: true })
+  phoneCountryCode?: string | null;
+
   @Column({ name: 'phone_number', type: 'varchar' })
   phone!: string;
 
   @Column({ type: 'varchar' })
   email!: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  specialization?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  notes?: string | null;
 }

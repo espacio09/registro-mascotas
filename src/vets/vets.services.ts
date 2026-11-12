@@ -52,8 +52,12 @@ export class VetsServices {
       .addSelect('vet.houseNumber', 'houseNumber')
       .addSelect('vet.postalCode', 'postalCode')
       .addSelect('vet.city', 'city')
+      .addSelect('vet.country', 'country')
+      .addSelect('vet.phoneCountryCode', 'phoneCountryCode')
       .addSelect('vet.phone', 'phone')
       .addSelect('vet.email', 'email')
+      .addSelect('vet.specialization', 'specialization')
+      .addSelect('vet.notes', 'notes')
       .orderBy('vet.id', 'ASC')
       .getRawMany<VetEntity>();
   }
@@ -89,6 +93,10 @@ export class VetsServices {
       houseNumber: createVetDto.houseNumber?.trim() || null,
       postalCode: createVetDto.postalCode?.trim() || null,
       city: createVetDto.city?.trim() || null,
+      country: createVetDto.country?.trim() || null,
+      phoneCountryCode: createVetDto.phoneCountryCode?.trim() || null,
+      specialization: createVetDto.specialization?.trim() || null,
+      notes: createVetDto.notes?.trim() || null,
       email,
       phone,
     });
@@ -129,6 +137,18 @@ export class VetsServices {
     }
     if (updateVetDto.city !== undefined) {
       vet.city = updateVetDto.city.trim() || null;
+    }
+    if (updateVetDto.country !== undefined) {
+      vet.country = updateVetDto.country.trim() || null;
+    }
+    if (updateVetDto.phoneCountryCode !== undefined) {
+      vet.phoneCountryCode = updateVetDto.phoneCountryCode.trim() || null;
+    }
+    if (updateVetDto.specialization !== undefined) {
+      vet.specialization = updateVetDto.specialization.trim() || null;
+    }
+    if (updateVetDto.notes !== undefined) {
+      vet.notes = updateVetDto.notes.trim() || null;
     }
     if (updateVetDto.email !== undefined) {
       vet.email = updateVetDto.email.trim();

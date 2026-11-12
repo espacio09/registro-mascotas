@@ -27,6 +27,22 @@ export class CreateVetDto {
 
   @IsString()
   @IsNotEmpty()
+  country!: string;
+
+  @IsOptional()
+  @IsString()
+  phoneCountryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  specialization?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsString()
+  @IsNotEmpty()
   @IsEmail()
   email!: string;
 
