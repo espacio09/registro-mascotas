@@ -32,12 +32,20 @@ describe('AppointmentsService', () => {
         appointmentDate: '2026-11-25T10:00:00',
         reason: ' Annual vaccination ',
         status: 'SCHEDULED',
+        notes: 'Bring vaccination records',
       }),
     ).resolves.toEqual(appointment);
     expect(query).toHaveBeenNthCalledWith(
       3,
       expect.stringContaining('INSERT INTO appointments'),
-      [15, 3, '2026-11-25T10:00:00', 'Annual vaccination', 'SCHEDULED'],
+      [
+        15,
+        3,
+        '2026-11-25T10:00:00',
+        'Annual vaccination',
+        'SCHEDULED',
+        'Bring vaccination records',
+      ],
     );
   });
 

@@ -13,6 +13,7 @@ export interface Appointment {
   appointmentDate: Date | string;
   reason: string;
   status: string;
+  notes?: string | null;
   vet?: string;
   petName?: string;
   ownerName?: string | null;
@@ -53,16 +54,18 @@ export class AppointmentsService {
           vet_id,
           appointment_date,
           reason,
-          status
+          status,
+          notes
         )
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING
           appointment_id AS "appointmentId",
           pet_id AS "petId",
           vet_id AS "vetId",
           appointment_date AS "appointmentDate",
           reason,
-          status
+          status,
+          notes
       `,
       [
         dto.petId,
@@ -70,6 +73,7 @@ export class AppointmentsService {
         dto.appointmentDate,
         reason,
         dto.status,
+        dto.notes?.trim() || null,
       ],
     );
 
@@ -94,6 +98,7 @@ export class AppointmentsService {
           appointments.appointment_date AS "appointmentDate",
           appointments.reason,
           appointments.status,
+          appointments.notes,
           CONCAT(veterinarians.first_name, ' ', veterinarians.last_name) AS vet
         FROM appointments
         INNER JOIN veterinarians
@@ -115,6 +120,7 @@ export class AppointmentsService {
           appointments.appointment_date AS "appointmentDate",
           appointments.reason,
           appointments.status,
+          appointments.notes,
           CONCAT(veterinarians.first_name, ' ', veterinarians.last_name) AS vet,
           pets.pet_name AS "petName",
           NULLIF(BTRIM(CONCAT(owners.first_name, ' ', owners.last_name)), '') AS "ownerName"

@@ -46,9 +46,11 @@ Before using owner deletion, apply
 backend. It creates the `archivoOwners` and `archivoPets` archive tables and
 links archived pets to their archived owner.
 
-Before using appointments, apply `sql/20261117_create_appointments.sql`. The API
-creates appointments with `POST /appointments`, lists all appointments with
-`GET /appointments`, and lists a pet's appointments with
+Before using appointments, apply `sql/20261117_create_appointments.sql` and
+`sql/20261118_add_appointment_notes.sql` in that order. The first creates the
+appointments table; the second adds `notes` for databases where the table
+already existed. The API creates appointments with `POST /appointments`, lists
+all appointments with `GET /appointments`, and lists a pet's appointments with
 `GET /pets/:id/appointments`. Supported statuses are `SCHEDULED`, `COMPLETED`,
 and `CANCELLED`.
 

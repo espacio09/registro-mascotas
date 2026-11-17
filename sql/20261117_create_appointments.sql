@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS appointments (
   appointment_date TIMESTAMPTZ NOT NULL,
   reason TEXT NOT NULL CHECK (BTRIM(reason) <> ''),
   status VARCHAR(20) NOT NULL
-    CHECK (status IN ('SCHEDULED', 'COMPLETED', 'CANCELLED'))
+    CHECK (status IN ('SCHEDULED', 'COMPLETED', 'CANCELLED')),
+  notes TEXT
 );
 
 CREATE INDEX IF NOT EXISTS appointments_pet_date_idx

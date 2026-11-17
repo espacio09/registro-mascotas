@@ -3,6 +3,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Min,
 } from 'class-validator';
@@ -31,4 +32,8 @@ export class CreateAppointmentDto {
 
   @IsIn(APPOINTMENT_STATUSES)
   status!: (typeof APPOINTMENT_STATUSES)[number];
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
