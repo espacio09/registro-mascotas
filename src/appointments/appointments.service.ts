@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 export interface Appointment {
   appointmentId: number;
@@ -78,6 +79,112 @@ export class AppointmentsService {
     );
 
     return appointmentRows[0];
+  }
+
+  async update(
+    appointmentId: number,
+    dto: UpdateAppointmentDto,
+  ): Promise<Appointment> {
+    const updates: Array<[string, unknown]> = [];
+
+    if (dto.appointmentDate !== undefined) {
+      updates.push(['appointment_date', dto.appointmentDate]);
+    }
+
+    if (dto.reason !== undefined) {
+      const reason = dto.reason.trim();
+      if (!reason) {
+        throw new BadRequestException('El motivo de la cita es obligatorio.');
+      }
+      updates.push(['reason', reason]);
+    }
+
+    if (dto.status !== undefined) {
+      updates.push(['status', dto.status]);
+    }
+
+    if (dto.notes !== undefined) {
+      updates.push(['notes', dto.notes?.trim() || null]);
+    }
+
+    if (updates.length === 0) {
+      throw new BadRequestException('No hay cambios para guardar.');
+    }
+
+    const assignments = updates.map(
+      ([column], index) => `${column} = $${index + 1}`,
+    );
+    const parameters = updates.map(([, value]) => value);
+    parameters.push(appointmentId);
+    const appointmentRows: Appointment[] = await this.dataSource.query(
+      `
+        UPDATE appointments
+        SET ${assignments.join(', ')}
+        WHERE appointment_id = $${parameters.length}
+        RETURNING
+          appointment_id AS "appointmentId",
+          pet_id AS "petId",
+          vet_id AS "vetId",
+          appointment_date AS "appointmentDate",
+          reason,
+          status,
+          notes
+      `,
+      parameters,
+    );
+
+    if (appointmentRows.length === 0) {
+      throw new NotFoundException(`Cita ${appointmentId} no encontrada.`);
+    }
+
+    return appointmentRows[0];
+  }
+
+  async remove(appointmentId: number): Promise<void> {
+    const deletedRows: Array<{ appointment_id: number }> =
+      await this.dataSource.query(
+        `
+          DELETE FROM appointments
+          WHERE appointment_id = $1
+          RETURNING appointment_id
+        `,
+        [appointmentId],
+      );
+
+    if (deletedRows.length === 0) {
+      throw new NotFoundException(`Cita ${appointmentId} no encontrada.`);
+    }
+  }
+
+  async removeMany(appointmentIds: number[]): Promise<void> {
+    const uniqueIds = [...new Set(appointmentIds)];
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException('Selecciona al menos una cita.');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const existingRows: Array<{ appointment_id: number }> =
+        await manager.query(
+          `
+            SELECT appointment_id
+            FROM appointments
+            WHERE appointment_id = ANY($1::int[])
+            FOR UPDATE
+          `,
+          [uniqueIds],
+        );
+
+      if (existingRows.length !== uniqueIds.length) {
+        throw new NotFoundException(
+          'Una o más citas seleccionadas ya no existen.',
+        );
+      }
+
+      await manager.query(
+        'DELETE FROM appointments WHERE appointment_id = ANY($1::int[])',
+        [uniqueIds],
+      );
+    });
   }
 
   async findByPet(petId: number): Promise<Appointment[]> {

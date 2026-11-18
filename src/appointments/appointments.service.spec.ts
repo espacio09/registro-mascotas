@@ -1,14 +1,20 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AppointmentsService } from './appointments.service';
 
 describe('AppointmentsService', () => {
   let query: jest.Mock;
+  let transaction: jest.Mock;
   let service: AppointmentsService;
 
   beforeEach(() => {
     query = jest.fn();
-    service = new AppointmentsService({ query } as unknown as DataSource);
+    transaction = jest.fn();
+    transaction.mockImplementation((operation) => operation({ query }));
+    service = new AppointmentsService({
+      query,
+      transaction,
+    } as unknown as DataSource);
   });
 
   it('creates an appointment linked to an existing pet and vet', async () => {
@@ -75,6 +81,106 @@ describe('AppointmentsService', () => {
       }),
     ).rejects.toThrow('El motivo de la cita es obligatorio.');
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it('updates appointment details', async () => {
+    const updatedAppointment = {
+      appointmentId: 1,
+      petId: 15,
+      vetId: 3,
+      appointmentDate: '2026-11-25T10:00:00.000Z',
+      reason: 'Examinacion defecacion',
+      status: 'COMPLETED',
+      notes: 'Updated notes',
+    };
+    query.mockResolvedValueOnce([updatedAppointment]);
+
+    await expect(
+      service.update(1, {
+        appointmentDate: '2026-11-25T10:00:00.000Z',
+        reason: ' Examinacion defecacion ',
+        status: 'COMPLETED',
+        notes: ' Updated notes ',
+      }),
+    ).resolves.toEqual(updatedAppointment);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE appointments'),
+      [
+        '2026-11-25T10:00:00.000Z',
+        'Examinacion defecacion',
+        'COMPLETED',
+        'Updated notes',
+        1,
+      ],
+    );
+  });
+
+  it('rejects a blank update reason', async () => {
+    await expect(
+      service.update(1, { reason: '   ' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('rejects updates without changes', async () => {
+    await expect(service.update(1, {})).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('reports when the appointment to update does not exist', async () => {
+    query.mockResolvedValueOnce([]);
+
+    await expect(
+      service.update(404, { status: 'COMPLETED' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deletes an existing appointment', async () => {
+    query.mockResolvedValueOnce([{ appointment_id: 1 }]);
+
+    await expect(service.remove(1)).resolves.toBeUndefined();
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM appointments'),
+      [1],
+    );
+  });
+
+  it('deletes selected appointments in one transaction', async () => {
+    query
+      .mockResolvedValueOnce([{ appointment_id: 1 }, { appointment_id: 2 }])
+      .mockResolvedValueOnce([]);
+
+    await expect(service.removeMany([1, 2])).resolves.toBeUndefined();
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('SELECT appointment_id'),
+      [[1, 2]],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('DELETE FROM appointments'),
+      [[1, 2]],
+    );
+  });
+
+  it('does not delete if a selected appointment no longer exists', async () => {
+    query.mockResolvedValueOnce([{ appointment_id: 1 }]);
+
+    await expect(service.removeMany([1, 2])).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports when the appointment to delete does not exist', async () => {
+    query.mockResolvedValueOnce([]);
+
+    await expect(service.remove(404)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('returns the vet name with each pet appointment', async () => {
