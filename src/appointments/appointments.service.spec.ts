@@ -115,6 +115,109 @@ describe('AppointmentsService', () => {
     );
   });
 
+  it('creates a visit and updates its appointment in one transaction', async () => {
+    const visit = {
+      visitId: 7,
+      appointmentId: 1,
+      billingId: null,
+      reason: 'Annual check',
+      diagnosis: 'Healthy',
+      treatment: 'No treatment needed',
+      medication: null,
+      visitNotes: 'Follow up next year',
+      indication: null,
+      status: 'COMPLETED',
+    };
+    query
+      .mockResolvedValueOnce([{ petId: 15, vetId: 3, ownerId: 25 }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([visit]);
+
+    await expect(
+      service.createVisit(1, {
+        appointment: {
+          appointmentDate: '2026-11-25T10:00:00.000Z',
+          reason: ' Vaccination ',
+          status: 'COMPLETED',
+          notes: ' Appointment note ',
+        },
+        reason: ' Annual check ',
+        diagnosis: ' Healthy ',
+        treatment: ' No treatment needed ',
+        visitNotes: ' Follow up next year ',
+        status: 'COMPLETED',
+      }),
+    ).resolves.toEqual(visit);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('FOR UPDATE OF appointments'),
+      [1],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('UPDATE appointments'),
+      [
+        '2026-11-25T10:00:00.000Z',
+        'Vaccination',
+        'COMPLETED',
+        'Appointment note',
+        1,
+      ],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('INSERT INTO visits'),
+      [
+        15,
+        '2026-11-25T10:00:00.000Z',
+        3,
+        25,
+        1,
+        'Annual check',
+        'Healthy',
+        'No treatment needed',
+        null,
+        'Follow up next year',
+        null,
+        'COMPLETED',
+      ],
+    );
+  });
+
+  it('does not create a visit for a missing appointment', async () => {
+    query.mockResolvedValueOnce([]);
+
+    await expect(
+      service.createVisit(404, {
+        appointment: {
+          appointmentDate: '2026-11-25T10:00:00.000Z',
+          reason: 'Vaccination',
+          status: 'SCHEDULED',
+        },
+        reason: 'Annual check',
+        status: 'SCHEDULED',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a blank visit reason before starting a transaction', async () => {
+    await expect(
+      service.createVisit(1, {
+        appointment: {
+          appointmentDate: '2026-11-25T10:00:00.000Z',
+          reason: 'Vaccination',
+          status: 'SCHEDULED',
+        },
+        reason: '   ',
+        status: 'SCHEDULED',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
   it('rejects a blank update reason', async () => {
     await expect(
       service.update(1, { reason: '   ' }),

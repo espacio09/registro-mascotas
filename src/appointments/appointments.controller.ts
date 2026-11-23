@@ -10,10 +10,12 @@ import {
 } from '@nestjs/common';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { DeleteAppointmentsDto } from './dto/delete-appointments.dto';
+import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import {
   Appointment,
   AppointmentsService,
+  Visit,
 } from './appointments.service';
 
 @Controller()
@@ -38,6 +40,14 @@ export class AppointmentsController {
     @Body() dto: UpdateAppointmentDto,
   ): Promise<Appointment> {
     return this.appointmentsService.update(appointmentId, dto);
+  }
+
+  @Post('appointments/:id/visits')
+  createVisit(
+    @Param('id', ParseIntPipe) appointmentId: number,
+    @Body() dto: CreateVisitDto,
+  ): Promise<Visit> {
+    return this.appointmentsService.createVisit(appointmentId, dto);
   }
 
   @Delete('appointments')

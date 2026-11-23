@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 export interface Appointment {
@@ -18,6 +19,19 @@ export interface Appointment {
   vet?: string;
   petName?: string;
   ownerName?: string | null;
+}
+
+export interface Visit {
+  visitId: number;
+  appointmentId: number;
+  billingId: number | null;
+  reason: string;
+  diagnosis: string | null;
+  treatment: string | null;
+  medication: string | null;
+  visitNotes: string | null;
+  indication: string | null;
+  status: string;
 }
 
 @Injectable()
@@ -138,6 +152,104 @@ export class AppointmentsService {
     }
 
     return appointmentRows[0];
+  }
+
+  async createVisit(
+    appointmentId: number,
+    dto: CreateVisitDto,
+  ): Promise<Visit> {
+    const appointmentReason = dto.appointment.reason.trim();
+    const reason = dto.reason.trim();
+    if (!appointmentReason || !reason) {
+      throw new BadRequestException(
+        'El motivo de la cita y de la visita es obligatorio.',
+      );
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const appointmentRows: Array<{
+        petId: number;
+        vetId: number;
+        ownerId: number | string | null;
+      }> = await manager.query(
+        `
+          SELECT
+            appointments.pet_id AS "petId",
+            appointments.vet_id AS "vetId",
+            pets.owner_id AS "ownerId"
+          FROM appointments
+          INNER JOIN pets ON pets.pet_id = appointments.pet_id
+          WHERE appointments.appointment_id = $1
+          FOR UPDATE OF appointments
+        `,
+        [appointmentId],
+      );
+      if (appointmentRows.length === 0) {
+        throw new NotFoundException(`Cita ${appointmentId} no encontrada.`);
+      }
+
+      await manager.query(
+        `
+          UPDATE appointments
+          SET appointment_date = $1, reason = $2, status = $3, notes = $4
+          WHERE appointment_id = $5
+        `,
+        [
+          dto.appointment.appointmentDate,
+          appointmentReason,
+          dto.appointment.status,
+          dto.appointment.notes?.trim() || null,
+          appointmentId,
+        ],
+      );
+
+      const visitRows: Visit[] = await manager.query(
+        `
+          INSERT INTO visits (
+            pet_id,
+            visit_date,
+            vet_id,
+            owner_id,
+            appointment_id,
+            reason,
+            diagnosis,
+            treatment,
+            medication,
+            notes,
+            indication,
+            status
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          RETURNING
+            visit_id AS "visitId",
+            appointment_id AS "appointmentId",
+            billing_id AS "billingId",
+            reason,
+            diagnosis,
+            treatment,
+            medication,
+            notes AS "visitNotes",
+            indication,
+            status
+        `,
+        [
+          appointmentRows[0].petId,
+          dto.appointment.appointmentDate,
+          appointmentRows[0].vetId,
+          appointmentRows[0].ownerId,
+          appointmentId,
+          reason,
+          dto.diagnosis?.trim() || null,
+          dto.treatment?.trim() || null,
+          dto.medication?.trim() || null,
+          dto.visitNotes?.trim() || null,
+          dto.indication?.trim() || null,
+          dto.status,
+        ],
+      );
+
+      return visitRows[0];
+    });
   }
 
   async remove(appointmentId: number): Promise<void> {
