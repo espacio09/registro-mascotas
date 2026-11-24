@@ -11,10 +11,10 @@ import {
 import { APPOINTMENT_STATUSES } from './create-appointment.dto';
 
 export const VISIT_STATUSES = [
-  'SCHEDULED',
+  'OPEN',
   'IN_PROGRESS',
   'COMPLETED',
-  'CANCELLED',
+  'FOLLOW_UP_REQUIRED',
 ] as const;
 
 export class AppointmentDetailsForVisitDto {
@@ -64,5 +64,5 @@ export class CreateVisitDto {
   indication?: string;
 
   @IsIn(VISIT_STATUSES)
-  status!: (typeof VISIT_STATUSES)[number];
+  visitStatus!: (typeof VISIT_STATUSES)[number];
 }

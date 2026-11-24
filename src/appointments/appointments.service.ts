@@ -23,7 +23,7 @@ export interface Appointment {
 
 export interface Visit {
   visitId: number;
-  appointmentId: number;
+  appointmentId: number | null;
   billingId: number | null;
   reason: string;
   diagnosis: string | null;
@@ -31,7 +31,25 @@ export interface Visit {
   medication: string | null;
   visitNotes: string | null;
   indication: string | null;
-  status: string;
+  visitStatus: string;
+}
+
+export interface VisitListItem extends Visit {
+  visitDate: Date | string;
+  petId: number;
+  petName: string | null;
+  ownerName: string | null;
+  vet: string | null;
+}
+
+export interface BillingListItem {
+  billingId: number;
+  visitId: number;
+  billingStatus: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED';
+  visitDate: Date | string;
+  petName: string | null;
+  ownerName: string | null;
+  reason: string;
 }
 
 @Injectable()
@@ -217,7 +235,7 @@ export class AppointmentsService {
             medication,
             notes,
             indication,
-            status
+            visit_status
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           RETURNING
@@ -230,7 +248,7 @@ export class AppointmentsService {
             medication,
             notes AS "visitNotes",
             indication,
-            status
+            visit_status AS "visitStatus"
         `,
         [
           appointmentRows[0].petId,
@@ -244,12 +262,89 @@ export class AppointmentsService {
           dto.medication?.trim() || null,
           dto.visitNotes?.trim() || null,
           dto.indication?.trim() || null,
-          dto.status,
+          dto.visitStatus,
         ],
       );
 
-      return visitRows[0];
+      const billingRows: Array<{ billingId: number }> = await manager.query(
+        `
+          INSERT INTO billings (visit_id, billing_status)
+          VALUES ($1, 'OPEN')
+          RETURNING billing_id AS "billingId"
+        `,
+        [visitRows[0].visitId],
+      );
+      const billingId = billingRows[0].billingId;
+      const updatedVisitRows: Visit[] = await manager.query(
+        `
+          UPDATE visits
+          SET billing_id = $1
+          WHERE visit_id = $2
+          RETURNING
+            visit_id AS "visitId",
+            appointment_id AS "appointmentId",
+            billing_id AS "billingId",
+            reason,
+            diagnosis,
+            treatment,
+            medication,
+            notes AS "visitNotes",
+            indication,
+            visit_status AS "visitStatus"
+        `,
+        [billingId, visitRows[0].visitId],
+      );
+
+      return updatedVisitRows[0];
     });
+  }
+
+  findAllVisits(): Promise<VisitListItem[]> {
+    return this.dataSource.query(
+      `
+        SELECT
+          visits.visit_id AS "visitId",
+          visits.appointment_id AS "appointmentId",
+          visits.billing_id AS "billingId",
+          visits.visit_date AS "visitDate",
+          visits.pet_id AS "petId",
+          pets.pet_name AS "petName",
+          NULLIF(BTRIM(CONCAT(owners.first_name, ' ', owners.last_name)), '') AS "ownerName",
+          NULLIF(BTRIM(CONCAT(veterinarians.first_name, ' ', veterinarians.last_name)), '') AS vet,
+          visits.reason,
+          visits.diagnosis,
+          visits.treatment,
+          visits.medication,
+          visits.notes AS "visitNotes",
+          visits.indication,
+          visits.visit_status AS "visitStatus"
+        FROM visits
+        INNER JOIN pets ON pets.pet_id = visits.pet_id
+        LEFT JOIN owners ON owners.owner_id = pets.owner_id
+        LEFT JOIN veterinarians ON veterinarians.vet_id = visits.vet_id
+        ORDER BY visits.visit_date DESC, visits.visit_id DESC
+      `,
+    );
+  }
+
+  findAllBillings(): Promise<BillingListItem[]> {
+    return this.dataSource.query(
+      `
+        SELECT
+          billings.billing_id AS "billingId",
+          billings.visit_id AS "visitId",
+          billings.billing_status AS "billingStatus",
+          visits.visit_date AS "visitDate",
+          pets.pet_name AS "petName",
+          NULLIF(BTRIM(CONCAT(owners.first_name, ' ', owners.last_name)), '') AS "ownerName",
+          visits.reason
+        FROM billings
+        INNER JOIN visits ON visits.visit_id = billings.visit_id
+        INNER JOIN pets ON pets.pet_id = visits.pet_id
+        LEFT JOIN owners ON owners.owner_id = pets.owner_id
+        ORDER BY billings.billing_id DESC
+      `,
+    );
   }
 
   async remove(appointmentId: number): Promise<void> {

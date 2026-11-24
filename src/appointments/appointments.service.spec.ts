@@ -126,12 +126,14 @@ describe('AppointmentsService', () => {
       medication: null,
       visitNotes: 'Follow up next year',
       indication: null,
-      status: 'COMPLETED',
+      visitStatus: 'COMPLETED',
     };
     query
       .mockResolvedValueOnce([{ petId: 15, vetId: 3, ownerId: 25 }])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([visit]);
+      .mockResolvedValueOnce([visit])
+      .mockResolvedValueOnce([{ billingId: 12 }])
+      .mockResolvedValueOnce([{ ...visit, billingId: 12 }]);
 
     await expect(
       service.createVisit(1, {
@@ -145,9 +147,9 @@ describe('AppointmentsService', () => {
         diagnosis: ' Healthy ',
         treatment: ' No treatment needed ',
         visitNotes: ' Follow up next year ',
-        status: 'COMPLETED',
+        visitStatus: 'COMPLETED',
       }),
-    ).resolves.toEqual(visit);
+    ).resolves.toEqual({ ...visit, billingId: 12 });
 
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(query).toHaveBeenNthCalledWith(
@@ -184,6 +186,17 @@ describe('AppointmentsService', () => {
         'COMPLETED',
       ],
     );
+    expect(query.mock.calls[2][0]).toContain('visit_status');
+    expect(query).toHaveBeenNthCalledWith(
+      4,
+      expect.stringContaining('INSERT INTO billings'),
+      [7],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      5,
+      expect.stringContaining('UPDATE visits'),
+      [12, 7],
+    );
   });
 
   it('does not create a visit for a missing appointment', async () => {
@@ -197,7 +210,7 @@ describe('AppointmentsService', () => {
           status: 'SCHEDULED',
         },
         reason: 'Annual check',
-        status: 'SCHEDULED',
+        visitStatus: 'OPEN',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(query).toHaveBeenCalledTimes(1);
@@ -212,7 +225,7 @@ describe('AppointmentsService', () => {
           status: 'SCHEDULED',
         },
         reason: '   ',
-        status: 'SCHEDULED',
+        visitStatus: 'OPEN',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(transaction).not.toHaveBeenCalled();
@@ -314,6 +327,49 @@ describe('AppointmentsService', () => {
     await expect(service.findAll()).resolves.toEqual(appointments);
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining('LEFT JOIN owners'),
+    );
+  });
+
+  it('lists visits with their statuses and patient details', async () => {
+    const visits = [
+      {
+        visitId: 7,
+        appointmentId: 1,
+        visitDate: '2026-11-25T10:00:00.000Z',
+        petId: 15,
+        petName: 'Minnie Mouse',
+        ownerName: 'Tatjana Klatyik',
+        vet: 'Dr. Smith',
+        reason: 'Annual check',
+        visitStatus: 'FOLLOW_UP_REQUIRED',
+      },
+    ];
+    query.mockResolvedValueOnce(visits);
+
+    await expect(service.findAllVisits()).resolves.toEqual(visits);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('visits.visit_status AS "visitStatus"'),
+    );
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('LEFT JOIN owners'),
+    );
+  });
+
+  it('lists all billings with their linked visit details and statuses', async () => {
+    const billings = [
+      {
+        billingId: 12,
+        visitId: 7,
+        billingStatus: 'IN_PROGRESS',
+        petName: 'Minnie Mouse',
+        reason: 'Annual check',
+      },
+    ];
+    query.mockResolvedValueOnce(billings);
+
+    await expect(service.findAllBillings()).resolves.toEqual(billings);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('billings.billing_status AS "billingStatus"'),
     );
   });
 });

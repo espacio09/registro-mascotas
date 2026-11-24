@@ -15,7 +15,9 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import {
   Appointment,
   AppointmentsService,
+  BillingListItem,
   Visit,
+  VisitListItem,
 } from './appointments.service';
 
 @Controller()
@@ -48,6 +50,16 @@ export class AppointmentsController {
     @Body() dto: CreateVisitDto,
   ): Promise<Visit> {
     return this.appointmentsService.createVisit(appointmentId, dto);
+  }
+
+  @Get('visits')
+  findAllVisits(): Promise<VisitListItem[]> {
+    return this.appointmentsService.findAllVisits();
+  }
+
+  @Get('billings')
+  findAllBillings(): Promise<BillingListItem[]> {
+    return this.appointmentsService.findAllBillings();
   }
 
   @Delete('appointments')

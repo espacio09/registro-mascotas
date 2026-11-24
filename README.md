@@ -54,6 +54,18 @@ all appointments with `GET /appointments`, and lists a pet's appointments with
 `GET /pets/:id/appointments`. Supported statuses are `SCHEDULED`, `COMPLETED`,
 and `CANCELLED`.
 
+Before creating or listing visits, apply
+`sql/20261123_create_visits.sql` and `sql/20261124_visit_status.sql` after the
+appointment migrations. The second migration adds `visit_status` and maps
+existing visit statuses to the supported values: `OPEN`, `IN_PROGRESS`,
+`COMPLETED`, and `FOLLOW_UP_REQUIRED`. Visits are created with
+`POST /appointments/:id/visits` and listed with `GET /visits`.
+
+Apply `sql/20261124_create_billings.sql` after the visit migrations to create a
+Billing in `OPEN` status for each existing Visit. New visits also create an
+associated Billing automatically. All billings are listed with `GET /billings`;
+the homepage Billing tile counts billings whose status is not `COMPLETED`.
+
 ## Compile and run the project
 
 ```bash
