@@ -10,8 +10,10 @@ import {
 } from '@nestjs/common';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { DeleteAppointmentsDto } from './dto/delete-appointments.dto';
+import { DeleteVisitsDto } from './dto/delete-visits.dto';
 import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { UpdateVisitDto } from './dto/update-visit.dto';
 import {
   Appointment,
   AppointmentsService,
@@ -55,6 +57,19 @@ export class AppointmentsController {
   @Get('visits')
   findAllVisits(): Promise<VisitListItem[]> {
     return this.appointmentsService.findAllVisits();
+  }
+
+  @Delete('visits')
+  removeVisits(@Body() dto: DeleteVisitsDto): Promise<void> {
+    return this.appointmentsService.removeVisits(dto.visitIds);
+  }
+
+  @Patch('visits/:id')
+  updateVisit(
+    @Param('id', ParseIntPipe) visitId: number,
+    @Body() dto: UpdateVisitDto,
+  ): Promise<Visit> {
+    return this.appointmentsService.updateVisit(visitId, dto);
   }
 
   @Get('billings')

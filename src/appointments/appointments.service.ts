@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { CreateVisitDto } from './dto/create-visit.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { UpdateVisitDto } from './dto/update-visit.dto';
 
 export interface Appointment {
   appointmentId: number;
@@ -32,6 +33,7 @@ export interface Visit {
   visitNotes: string | null;
   indication: string | null;
   visitStatus: string;
+  followUpDate: string | null;
 }
 
 export interface VisitListItem extends Visit {
@@ -235,9 +237,10 @@ export class AppointmentsService {
             medication,
             notes,
             indication,
-            visit_status
+            visit_status,
+            follow_up_date
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
           RETURNING
             visit_id AS "visitId",
             appointment_id AS "appointmentId",
@@ -248,7 +251,8 @@ export class AppointmentsService {
             medication,
             notes AS "visitNotes",
             indication,
-            visit_status AS "visitStatus"
+            visit_status AS "visitStatus",
+            follow_up_date AS "followUpDate"
         `,
         [
           appointmentRows[0].petId,
@@ -263,6 +267,7 @@ export class AppointmentsService {
           dto.visitNotes?.trim() || null,
           dto.indication?.trim() || null,
           dto.visitStatus,
+          dto.followUpDate ?? null,
         ],
       );
 
@@ -290,13 +295,54 @@ export class AppointmentsService {
             medication,
             notes AS "visitNotes",
             indication,
-            visit_status AS "visitStatus"
+            visit_status AS "visitStatus",
+            follow_up_date AS "followUpDate"
         `,
         [billingId, visitRows[0].visitId],
       );
 
       return updatedVisitRows[0];
     });
+  }
+
+  async updateVisit(visitId: number, dto: UpdateVisitDto): Promise<Visit> {
+    const reason = dto.reason.trim();
+    if (!reason) {
+      throw new BadRequestException('El motivo de la visita es obligatorio.');
+    }
+
+    const rows: Visit[] = await this.dataSource.query(
+      `
+        UPDATE visits
+        SET reason = $1, diagnosis = $2, treatment = $3, medication = $4,
+            notes = $5, indication = $6, visit_status = $7, follow_up_date = $8
+        WHERE visit_id = $9
+        RETURNING
+          visit_id AS "visitId",
+          appointment_id AS "appointmentId",
+          billing_id AS "billingId",
+          reason, diagnosis, treatment, medication,
+          notes AS "visitNotes",
+          indication,
+          visit_status AS "visitStatus",
+          follow_up_date AS "followUpDate"
+      `,
+      [
+        reason,
+        dto.diagnosis.trim() || null,
+        dto.treatment.trim() || null,
+        dto.medication.trim() || null,
+        dto.visitNotes.trim() || null,
+        dto.indication.trim() || null,
+        dto.visitStatus,
+        dto.followUpDate,
+        visitId,
+      ],
+    );
+    if (rows.length === 0) {
+      throw new NotFoundException(`Visita ${visitId} no encontrada.`);
+    }
+    return rows[0];
   }
 
   findAllVisits(): Promise<VisitListItem[]> {
@@ -317,7 +363,8 @@ export class AppointmentsService {
           visits.medication,
           visits.notes AS "visitNotes",
           visits.indication,
-          visits.visit_status AS "visitStatus"
+          visits.visit_status AS "visitStatus",
+          visits.follow_up_date AS "followUpDate"
         FROM visits
         INNER JOIN pets ON pets.pet_id = visits.pet_id
         LEFT JOIN owners ON owners.owner_id = pets.owner_id
@@ -345,6 +392,30 @@ export class AppointmentsService {
         ORDER BY billings.billing_id DESC
       `,
     );
+  }
+
+  async removeVisits(visitIds: number[]): Promise<void> {
+    const uniqueIds = [...new Set(visitIds)];
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException('Selecciona al menos una visita.');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const existingRows: Array<{ visit_id: number }> = await manager.query(
+        'SELECT visit_id FROM visits WHERE visit_id = ANY($1::int[]) FOR UPDATE',
+        [uniqueIds],
+      );
+      if (existingRows.length !== uniqueIds.length) {
+        throw new NotFoundException(
+          'Una o más visitas seleccionadas ya no existen.',
+        );
+      }
+
+      await manager.query(
+        'DELETE FROM visits WHERE visit_id = ANY($1::int[])',
+        [uniqueIds],
+      );
+    });
   }
 
   async remove(appointmentId: number): Promise<void> {

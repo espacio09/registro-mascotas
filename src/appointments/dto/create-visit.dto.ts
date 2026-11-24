@@ -5,6 +5,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  Matches,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -65,4 +66,9 @@ export class CreateVisitDto {
 
   @IsIn(VISIT_STATUSES)
   visitStatus!: (typeof VISIT_STATUSES)[number];
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  followUpDate?: string | null;
 }

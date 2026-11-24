@@ -60,6 +60,16 @@ appointment migrations. The second migration adds `visit_status` and maps
 existing visit statuses to the supported values: `OPEN`, `IN_PROGRESS`,
 `COMPLETED`, and `FOLLOW_UP_REQUIRED`. Visits are created with
 `POST /appointments/:id/visits` and listed with `GET /visits`.
+Apply `sql/20261124_visit_follow_up_date.sql` after the visit migrations to
+store optional date-only follow-up reminders. A reminder does not create an
+appointment, and existing `FOLLOW_UP_REQUIRED` visits remain listed.
+Update a visit's clinical details with `PATCH /visits/:id`, supplying `reason`,
+`diagnosis`, `treatment`, `medication`, `visitNotes`, `indication`, and
+`visitStatus`, plus `followUpDate` as `YYYY-MM-DD` or `null`. Send empty strings
+to clear optional clinical text fields.
+Delete visits with `DELETE /visits` and a JSON body containing a non-empty
+`visitIds` array. The deletion is atomic and also deletes their associated
+billings; the linked appointments are retained.
 
 Apply `sql/20261124_create_billings.sql` after the visit migrations to create a
 Billing in `OPEN` status for each existing Visit. New visits also create an

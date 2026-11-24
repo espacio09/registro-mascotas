@@ -184,6 +184,7 @@ describe('AppointmentsService', () => {
         'Follow up next year',
         null,
         'COMPLETED',
+        null,
       ],
     );
     expect(query.mock.calls[2][0]).toContain('visit_status');
@@ -353,6 +354,77 @@ describe('AppointmentsService', () => {
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining('LEFT JOIN owners'),
     );
+  });
+
+  it('updates clinical visit data without changing linked records', async () => {
+    const updated = { visitId: 7, reason: 'Illness', visitStatus: 'COMPLETED' };
+    query.mockResolvedValueOnce([updated]);
+    await expect(service.updateVisit(7, {
+      reason: ' Illness ',
+      diagnosis: ' Improved ',
+      treatment: '',
+      medication: ' ',
+      visitNotes: ' Note ',
+      indication: '',
+      visitStatus: 'COMPLETED',
+      followUpDate: '2026-12-10',
+    })).resolves.toEqual(updated);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE visits'),
+      ['Illness', 'Improved', null, null, 'Note', null, 'COMPLETED', '2026-12-10', 7],
+    );
+    expect(query.mock.calls[0][0]).not.toContain('appointment_id =');
+  });
+
+  it('rejects blank reasons and reports missing visits', async () => {
+    const dto = {
+      reason: ' ',
+      diagnosis: '',
+      treatment: '',
+      medication: '',
+      visitNotes: '',
+      indication: '',
+      visitStatus: 'OPEN' as const,
+      followUpDate: null,
+    };
+    await expect(service.updateVisit(7, dto)).rejects.toBeInstanceOf(BadRequestException);
+    expect(query).not.toHaveBeenCalled();
+    query.mockResolvedValueOnce([]);
+    await expect(service.updateVisit(7, { ...dto, reason: 'Check' })).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deletes selected visits atomically after checking they exist', async () => {
+    query.mockResolvedValueOnce([{ visit_id: 7 }, { visit_id: 8 }]);
+
+    await service.removeVisits([7, 8, 7]);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('FOR UPDATE'),
+      [[7, 8]],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      'DELETE FROM visits WHERE visit_id = ANY($1::int[])',
+      [[7, 8]],
+    );
+  });
+
+  it('does not delete any visits when a selected visit no longer exists', async () => {
+    query.mockResolvedValueOnce([{ visit_id: 7 }]);
+
+    await expect(service.removeVisits([7, 8])).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects an empty visit selection', async () => {
+    await expect(service.removeVisits([])).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(transaction).not.toHaveBeenCalled();
   });
 
   it('lists all billings with their linked visit details and statuses', async () => {
