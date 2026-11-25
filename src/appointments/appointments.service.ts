@@ -252,7 +252,7 @@ export class AppointmentsService {
             notes AS "visitNotes",
             indication,
             visit_status AS "visitStatus",
-            follow_up_date AS "followUpDate"
+            TO_CHAR(follow_up_date, 'YYYY-MM-DD') AS "followUpDate"
         `,
         [
           appointmentRows[0].petId,
@@ -296,7 +296,7 @@ export class AppointmentsService {
             notes AS "visitNotes",
             indication,
             visit_status AS "visitStatus",
-            follow_up_date AS "followUpDate"
+            TO_CHAR(follow_up_date, 'YYYY-MM-DD') AS "followUpDate"
         `,
         [billingId, visitRows[0].visitId],
       );
@@ -325,7 +325,7 @@ export class AppointmentsService {
           notes AS "visitNotes",
           indication,
           visit_status AS "visitStatus",
-          follow_up_date AS "followUpDate"
+          TO_CHAR(follow_up_date, 'YYYY-MM-DD') AS "followUpDate"
       `,
       [
         reason,
@@ -364,7 +364,7 @@ export class AppointmentsService {
           visits.notes AS "visitNotes",
           visits.indication,
           visits.visit_status AS "visitStatus",
-          visits.follow_up_date AS "followUpDate"
+          TO_CHAR(visits.follow_up_date, 'YYYY-MM-DD') AS "followUpDate"
         FROM visits
         INNER JOIN pets ON pets.pet_id = visits.pet_id
         LEFT JOIN owners ON owners.owner_id = pets.owner_id
@@ -411,6 +411,10 @@ export class AppointmentsService {
         );
       }
 
+      await manager.query(
+        'DELETE FROM medical_records WHERE vet_visit_id = ANY($1::int[])',
+        [uniqueIds],
+      );
       await manager.query(
         'DELETE FROM visits WHERE visit_id = ANY($1::int[])',
         [uniqueIds],

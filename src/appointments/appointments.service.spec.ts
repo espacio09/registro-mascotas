@@ -188,6 +188,9 @@ describe('AppointmentsService', () => {
       ],
     );
     expect(query.mock.calls[2][0]).toContain('visit_status');
+    expect(query.mock.calls[2][0]).toContain(
+      `TO_CHAR(follow_up_date, 'YYYY-MM-DD') AS "followUpDate"`,
+    );
     expect(query).toHaveBeenNthCalledWith(
       4,
       expect.stringContaining('INSERT INTO billings'),
@@ -197,6 +200,9 @@ describe('AppointmentsService', () => {
       5,
       expect.stringContaining('UPDATE visits'),
       [12, 7],
+    );
+    expect(query.mock.calls[4][0]).toContain(
+      `TO_CHAR(follow_up_date, 'YYYY-MM-DD') AS "followUpDate"`,
     );
   });
 
@@ -354,6 +360,11 @@ describe('AppointmentsService', () => {
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining('LEFT JOIN owners'),
     );
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `TO_CHAR(visits.follow_up_date, 'YYYY-MM-DD') AS "followUpDate"`,
+      ),
+    );
   });
 
   it('updates clinical visit data without changing linked records', async () => {
@@ -374,6 +385,9 @@ describe('AppointmentsService', () => {
       ['Illness', 'Improved', null, null, 'Note', null, 'COMPLETED', '2026-12-10', 7],
     );
     expect(query.mock.calls[0][0]).not.toContain('appointment_id =');
+    expect(query.mock.calls[0][0]).toContain(
+      `TO_CHAR(follow_up_date, 'YYYY-MM-DD') AS "followUpDate"`,
+    );
   });
 
   it('rejects blank reasons and reports missing visits', async () => {
@@ -406,6 +420,11 @@ describe('AppointmentsService', () => {
     );
     expect(query).toHaveBeenNthCalledWith(
       2,
+      'DELETE FROM medical_records WHERE vet_visit_id = ANY($1::int[])',
+      [[7, 8]],
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      3,
       'DELETE FROM visits WHERE visit_id = ANY($1::int[])',
       [[7, 8]],
     );
